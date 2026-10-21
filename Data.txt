@@ -1,0 +1,62 @@
+Auto-scaling:	
+	- You could manually launch more EC2 instances, but that creates problems:
+	- Someone must monitor the traffic.
+	- Someone must launch additional instances.
+	- Someone must terminate unnecessary instances when traffic decreases.
+	- The application needs to recover automatically if an instance fails.
+	- Auto-scaling solves that.
+	
+	- Auto Scaling does not automatically make an application highly available by itself. 
+	  You must configure the appropriate Availability Zones, networking, health checks, and other components.
+	  
+Example:
+	- If we have node application running on ec2
+	- We can configure following rules:
+		- Minimum Instance: 2
+		- Desired Instance: 3
+		- Maximum Instance: 6
+		- Scale out thresold: Average CPU above 70%
+		- Scale in thresold: Average CPU around 35%
+		
+How it launch ec2 instance:	
+	1. Launch template
+	2. ASG: 
+		- Auto-scaling group
+		- manage ec2 instances and maintain configured capacity
+		
+Scaling policy:
+	- how an Auto Scaling Group should adjust its desired capacity when specified conditions occur.
+	
+	Target scaling:
+		- Choose metric and target value, aws adjust capacity to keep metric near the target
+		- Metric: Average CPU utilization
+		- Target: 50%
+		
+	Step scaling:
+		- Step scaling lets you define different scaling adjustments depending on how far a CloudWatch alarm metric breaches 
+		  a threshold. You create CloudWatch alarms and associate them with scaling policies.
+		- ex.
+			- CPU above 60%: Add 1 instance
+			- CPU above 80%: Add 2 instance
+			
+	Simple scaling:
+		- It uses cloudwatch alarm to trigger one predefined scaling adjustment
+		- it then applis cooldown period before another scaling activity
+		- ex. 
+			- Alarm: Average CPU exceeds 70%.
+			- Action: Add one instance.
+			- Cooldown: 300 seconds.
+	
+	Schedules scaling:
+		- it changes capacity according to timetable you know in advance
+		- ex.
+			- before business hours: minimum-1, maximum-1, desired-1
+			- business hours: minimum-2, maximum-5, desired-2
+			- After business hours: minimum-1, maximum-1, desired-1
+	
+	Predictive scaling:
+		- it uses historical data to forecast upcoming demand and provision capactiy in advance
+		- ex. 
+			suppose your application receives a large number of requests every weekday at 9 AM.
+	
+			
