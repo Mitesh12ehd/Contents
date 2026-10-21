@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>devpc049 - /</title>
+<style>
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #222;
+    background: #fff;
+    max-width: 980px;
+    margin: 24px auto;
+    padding: 0 22px 60px 22px;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-size: 15px;
+    font-weight: normal;
+    margin: 26px 0 8px 0;
+  }
+  h1 { border-bottom: 1px solid #888; padding-bottom: 6px; }
+  h2 { border-top: 1px solid #aaa; padding-top: 18px; margin-top: 40px; }
+  h3 { border-top: 1px dotted #ccc; padding-top: 12px; }
+  b, strong, em, i, mark { font-weight: normal; font-style: normal; background: none; }
+  code, pre {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 14px;
+    background: none;
+  }
+  pre {
+    border-left: 2px solid #ccc;
+    padding: 4px 0 4px 12px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+    text-align: left;
+    vertical-align: top;
+    font-weight: normal;
+    font-size: 15px;
+  }
+  a { color: inherit; }
+  ul, ol { margin-top: 4px; }
+  li { margin-bottom: 3px; }
+  .note { border-left: 2px solid #ccc; padding-left: 12px; margin: 10px 0; }
+  @media print { body { max-width: none; margin: 0; } h2 { page-break-before: always; } }
+</style>
+</head>
+<body>
+
+<h1>EC2 Scaling and Load Balancing - Ordered Learning Guide (with labs, assignments, live-environment issues)</h1>
+
+<p>Audience: someone who knows basic EC2 (launching an instance, security groups, VPC/subnets) and wants to run scalable, highly available workloads in production.</p>
+
+<h2 id="toc">Table of contents</h2>
+<ol>
+  <li><a href="#m0">Module 0 - How to use this guide, learning order, lab setup, cost warning</a></li>
+  <li><a href="#m1">Module 1 - Foundations: scaling, availability, stateless design</a></li>
+  <li><a href="#m2">Module 2 - Load Balancing + EC2</a>
+    <ol>
+      <li>Why a load balancer</li><li>ELB family</li><li>ALB</li><li>NLB</li><li>ALB vs NLB</li><li>Target groups</li><li>EC2 as target</li><li>Load balancer health checks</li><li>Connection draining</li><li>Sticky sessions</li><li>Cross-zone load balancing</li><li>TLS termination</li><li>Labs and assignments</li>
+    </ol>
+  </li>
+  <li><a href="#m3">Module 3 - Auto Scaling fundamentals</a>
+    <ol>
+      <li>What is Auto Scaling</li><li>Launch template</li><li>Launch configuration (legacy)</li><li>Auto Scaling group</li><li>Minimum, desired, maximum capacity</li><li>Multi-AZ Auto Scaling</li><li>Health checks</li><li>Replacement of unhealthy instances</li><li>Labs and assignments</li>
+    </ol>
+  </li>
+  <li><a href="#m4">Module 4 - Scaling policies</a>
+    <ol>
+      <li>Overview and choosing a policy</li><li>Scaling based on CloudWatch</li><li>Target tracking</li><li>Step scaling</li><li>Simple scaling</li><li>Scheduled scaling</li><li>Predictive scaling</li><li>Cooldown, warmup, and combining policies</li><li>Labs and assignments</li>
+    </ol>
+  </li>
+  <li><a href="#m5">Module 5 - Advanced Auto Scaling operations</a>
+    <ol>
+      <li>Lifecycle hooks</li><li>Instance refresh</li><li>Warm pools</li><li>Other operational controls (scale-in protection, standby, suspend processes, termination policies)</li><li>Labs and assignments</li>
+    </ol>
+  </li>
+  <li><a href="#m6">Module 6 - Putting it together: Auto Scaling + ALB</a>
+    <ol>
+      <li>Auto Scaling with ALB</li><li>Dynamic registration</li><li>EC2 behind ALB reference architecture</li><li>End-to-end request and scaling walkthrough</li><li>Capstone lab</li>
+    </ol>
+  </li>
+  <li><a href="#m7">Module 7 - Live environment: priorities, checklist, common issues, runbook</a></li>
+  <li><a href="#m8">Module 8 - Self assessment: quiz, scenarios, capstone project</a></li>
+  <li><a href="#app">Appendix - CLI cheat sheet, cleanup, glossary, answers</a></li>
+</ol>
+
+
+<!-- ============================================================ -->
+<h2 id="m0">Module 0 - How to use this guide</h2>
+
+<h3>0.1 Why this order</h3>
+<p>Your list put EC2 Scaling first and Load Balancing second. This guide teaches load balancing first, then Auto Scaling, then the combination. Reasons:</p>
+<ul>
+  <li>Auto Scaling health checks, dynamic registration, and the request count scaling metric all depend on target groups and load balancer health checks. Without those concepts, half of Auto Scaling looks abstract.</li>
+  <li>In real life, an ALB plus a fixed pair of EC2 instances is a valid first architecture. Auto Scaling is added on top.</li>
+  <li>Every topic from both of your lists is covered. Topics that appear in both lists (Auto Scaling + ALB, health checks) are taught once in depth and cross-referenced.</li>
+</ul>
+
+<h3>0.2 Structure of each topic</h3>
+<ul>
+  <li>Concept - what it is and why it exists.</li>
+  <li>How it works - mechanics and important settings with default values.</li>
+  <li>Production importance - Critical, High, Medium, or Low. Critical means a wrong setting commonly causes outages in live environments.</li>
+  <li>Take care in live - things to configure or watch in production.</li>
+  <li>Common live issue - a real-world failure pattern, its cause, and the fix.</li>
+</ul>
+
+<h3>0.3 Suggested schedule (about 3 weeks, 1 to 2 hours per day)</h3>
+<table>
+  <tr><th>Days</th><th>Content</th></tr>
+  <tr><td>Day 1</td><td>Module 0 and Module 1. Set up the lab VPC.</td></tr>
+  <tr><td>Days 2 to 5</td><td>Module 2 (load balancing). Labs 2A to 2D.</td></tr>
+  <tr><td>Days 6 to 8</td><td>Module 3 (Auto Scaling fundamentals). Labs 3A to 3C.</td></tr>
+  <tr><td>Days 9 to 12</td><td>Module 4 (scaling policies). Labs 4A to 4D.</td></tr>
+  <tr><td>Days 13 to 15</td><td>Module 5 (lifecycle hooks, instance refresh, warm pools). Labs 5A to 5C.</td></tr>
+  <tr><td>Days 16 to 18</td><td>Module 6 capstone lab.</td></tr>
+  <tr><td>Days 19 to 21</td><td>Module 7 and Module 8. Do the scenario questions without looking at answers. Break things on purpose using the runbook.</td></tr>
+</table>
+
+<h3>0.4 Lab setup</h3>
+<ul>
+  <li>Use a personal AWS account, not a work account. Use a region close to you (examples use ap-south-1, Mumbai).</li>
+  <li>Run CLI commands in AWS CloudShell (bash). The commands in this guide use bash quoting. PowerShell quoting of JSON is different and is a common source of errors.</li>
+  <li>VPC for labs: one VPC, 2 public subnets in 2 different Availability Zones (AZs), and 2 private subnets in the same 2 AZs. For cheap labs you may put EC2 in public subnets with public IPs to avoid NAT Gateway cost. In production, EC2 goes in private subnets.</li>
+  <li>Create an IAM role for EC2 named web-ec2-role with the managed policies AmazonSSMManagedInstanceCore and CloudWatchAgentServerPolicy. Use Session Manager instead of SSH keys.</li>
+  <li>Two security groups:
+    <ul>
+      <li>alb-sg: inbound 80 and 443 from 0.0.0.0/0.</li>
+      <li>web-sg: inbound 80 only from alb-sg (source is the security group, not a CIDR).</li>
+    </ul>
+  </li>
+</ul>
+
+<p>Standard user data script used across labs (Amazon Linux 2023). It serves a page showing instance ID and AZ, plus a /health endpoint:</p>
+<pre>#!/bin/bash
+dnf install -y nginx
+TOKEN=$(curl -sX PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+AZ=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/availability-zone)
+echo "&lt;p&gt;Instance $ID in $AZ - version v1&lt;/p&gt;" &gt; /usr/share/nginx/html/index.html
+echo "OK" &gt; /usr/share/nginx/html/health
+systemctl enable --now nginx</pre>
+
+<h3>0.5 Cost warning</h3>
+<ul>
+  <li>ALB and NLB charge per hour plus per capacity unit even with zero traffic (roughly USD 0.02 to 0.03 per hour plus usage, varies by region).</li>
+  <li>NAT Gateway charges per hour plus per GB. It is often the most expensive item in a lab.</li>
+  <li>Auto Scaling itself is free. You pay for the EC2 instances, EBS volumes, and CloudWatch detailed monitoring and alarms.</li>
+  <li>Set a billing alarm or AWS Budget before starting. Run the cleanup in the Appendix at the end of each lab day.</li>
+</ul>
+
+
+<!-- ============================================================ -->
+<h2 id="m1">Module 1 - Foundations</h2>
+
+<h3>1.1 Vertical vs horizontal scaling</h3>
+<ul>
+  <li>Vertical scaling (scale up): bigger instance type, for example t3.medium to m6i.xlarge. Needs a stop/start, has an upper limit, and the single instance is still a single point of failure.</li>
+  <li>Horizontal scaling (scale out): more instances of the same type. No hard limit, survives the loss of an instance, but requires the application to be stateless and requires something to distribute traffic. That something is the load balancer. Something has to add and remove instances. That is Auto Scaling.</li>
+</ul>
+
+<h3>1.2 High availability vs scalability vs elasticity</h3>
+<ul>
+  <li>High availability: the service survives failure of an instance or a whole AZ. Achieved by running in at least 2 AZs.</li>
+  <li>Scalability: the system can handle more load by adding resources.</li>
+  <li>Elasticity: resources are added and removed automatically to match demand, so you pay only for what you need.</li>
+</ul>
+
+<h3>1.3 Stateless application design (Production importance: Critical)</h3>
+<p>Auto Scaling will terminate instances at any time (scale in, health replacement, instance refresh, Spot interruption). Anything stored only on the instance is lost.</p>
+<ul>
+  <li>Sessions: store in ElastiCache (Redis/Valkey), DynamoDB, or signed tokens (JWT). Avoid relying on sticky sessions as the only mechanism.</li>
+  <li>Uploaded files: store in S3, not local disk.</li>
+  <li>Logs: ship to CloudWatch Logs or another central system. Local logs vanish on termination, which removes the evidence you need for post-incident analysis.</li>
+  <li>Configuration: pull from SSM Parameter Store or Secrets Manager at boot, not baked into a single hand-edited server.</li>
+  <li>Cron jobs: do not run them on every web instance. Use EventBridge Scheduler, a separate worker, or a leader-election mechanism.</li>
+</ul>
+<p>Common live issue: a team migrates a legacy app behind an ALB with 2 instances. Users get logged out randomly. Cause: sessions in local memory. Quick fix: enable stickiness. Real fix: move sessions to Redis.</p>
+
+<h3>1.4 The target architecture you will build</h3>
+<pre>Users
+  |
+Route 53 (alias record: app.example.com)
+  |
+Application Load Balancer  (public subnets, AZ-a and AZ-b, HTTPS 443, ACM certificate)
+  |
+Target group (HTTP 80, health check /health)
+  |
+Auto Scaling group  (private subnets, AZ-a and AZ-b, min 2, desired 2, max 6)
+  |-- EC2 (AZ-a)     |-- EC2 (AZ-b)     ... added and removed automatically
+  |
+Database / cache (Multi-AZ RDS, ElastiCache)  - shared state lives here</pre>
+
+
+<!-- ============================================================ -->
+<h2 id="m2">Module 2 - Load Balancing + EC2</h2>
+
+<h3 id="m2-1">2.1 Why a load balancer?</h3>
+<p>Concept: a load balancer is a single stable endpoint (DNS name) that receives client traffic and spreads it across multiple backend targets.</p>
+<p>What it gives you:</p>
+<ul>
+  <li>Traffic distribution across many instances, so no single instance is overloaded.</li>
+  <li>Health checking: traffic goes only to healthy targets. Failed instances are bypassed automatically.</li>
+  <li>High availability across AZs.</li>
+  <li>A stable endpoint: instances come and go, but clients keep using the same DNS name.</li>
+  <li>TLS termination in one place (certificates managed centrally with ACM).</li>
+  <li>Security boundary: instances can sit in private subnets with no public IPs; only the load balancer is internet facing.</li>
+  <li>Layer 7 routing (ALB): send /api to one service and /images to another, route by host name, etc.</li>
+  <li>Integration with WAF, Shield, access logs, and CloudWatch metrics.</li>
+</ul>
+<p>Without a load balancer, you would need DNS round robin (slow failover because of DNS caching, no health awareness) or a self-managed proxy such as HAProxy (which you would then need to make highly available yourself).</p>
+
+<h3 id="m2-2">2.2 The Elastic Load Balancing (ELB) family</h3>
+<table>
+  <tr><th>Type</th><th>Layer</th><th>Use for</th></tr>
+  <tr><td>Application Load Balancer (ALB)</td><td>7 (HTTP, HTTPS, gRPC, WebSocket)</td><td>Web apps, APIs, microservices, path and host routing</td></tr>
+  <tr><td>Network Load Balancer (NLB)</td><td>4 (TCP, UDP, TLS)</td><td>Very high throughput, low latency, static IPs, non-HTTP protocols</td></tr>
+  <tr><td>Gateway Load Balancer (GWLB)</td><td>3 (IP packets, GENEVE)</td><td>Inserting third-party firewalls and inspection appliances</td></tr>
+  <tr><td>Classic Load Balancer (CLB)</td><td>4 and 7 (legacy)</td><td>Do not use for new work. Migrate to ALB or NLB.</td></tr>
+</table>
+
+<h3 id="m2-3">2.3 Application Load Balancer (ALB)  - Production importance: Critical</h3>
+<p>Building blocks:</p>
+<ul>
+  <li>Load balancer: internet-facing (public subnets) or internal (private subnets). Must have subnets in at least 2 AZs. Has its own security group.</li>
+  <li>Listener: a protocol and port the ALB accepts, for example HTTP 80 and HTTPS 443.</li>
+  <li>Rules: evaluated in priority order on each listener. Conditions can match host header, path, HTTP method, HTTP headers, query string, and source IP.</li>
+  <li>Actions: forward (to one or more weighted target groups), redirect (for example HTTP to HTTPS), fixed response (for example a maintenance page), authenticate (Cognito or OIDC).</li>
+  <li>Target groups: the backend pools (section 2.6).</li>
+</ul>
+<p>Important behaviours:</p>
+<ul>
+  <li>The ALB terminates the client connection and opens a new connection to the target. The target sees the ALB's private IP as the source. The real client IP is in the X-Forwarded-For header; the original protocol is in X-Forwarded-Proto.</li>
+  <li>The ALB's IP addresses change over time. Always use the DNS name (Route 53 alias record), never hard-code IPs. If a client needs static IPs, put an NLB in front of the ALB (ALB as NLB target) or use Global Accelerator.</li>
+  <li>Idle timeout default is 60 seconds. If no data is sent for that long, the ALB closes the connection.</li>
+  <li>Routing algorithms per target group: round robin (default), least outstanding requests, weighted random (optionally with automatic target weights / anomaly mitigation).</li>
+  <li>The ALB scales itself automatically, but scales gradually. For a known huge spike (product launch, sale event), use the LCU capacity reservation feature or contact AWS Support beforehand.</li>
+  <li>Pricing: hourly plus Load Balancer Capacity Units (LCU), based on new connections, active connections, processed bytes, and rule evaluations.</li>
+</ul>
+<p>ALB-generated HTTP errors you must know for troubleshooting:</p>
+<table>
+  <tr><th>Code</th><th>Meaning</th><th>Typical cause</th></tr>
+  <tr><td>502 Bad Gateway</td><td>Target sent an invalid response or closed the connection</td><td>App crashed, app keep-alive timeout shorter than ALB idle timeout, malformed headers, TLS mismatch to target</td></tr>
+  <tr><td>503 Service Unavailable</td><td>No registered targets in the target group</td><td>Empty target group, ASG scaled to zero, wrong target group attached to rule</td></tr>
+  <tr><td>504 Gateway Timeout</td><td>Target did not respond within idle timeout</td><td>Slow queries, overloaded instances, security group or NACL blocking the target port</td></tr>
+  <tr><td>460</td><td>Client closed the connection before the ALB responded</td><td>Client timeout shorter than backend processing time</td></tr>
+  <tr><td>4xx from ELB vs from target</td><td>CloudWatch separates HTTPCode_ELB_4XX/5XX from HTTPCode_Target_4XX/5XX</td><td>Always check which one is rising</td></tr>
+</table>
+<p>Take care in live:</p>
+<ul>
+  <li>Enable access logs to S3 and connection logs if needed. They are disabled by default, and you will want them during the first incident.</li>
+  <li>Enable deletion protection.</li>
+  <li>Attach AWS WAF for internet-facing ALBs (rate limiting, managed rule groups).</li>
+  <li>Set the "drop invalid header fields" attribute to true and consider "desync mitigation mode" defensive or strictest.</li>
+  <li>Make sure the application's HTTP keep-alive timeout is longer than the ALB idle timeout (for example ALB 60 s, nginx keepalive_timeout 75 s, Node.js server.keepAliveTimeout 65000 ms).</li>
+</ul>
+<p>Common live issue: intermittent 502 errors at low rates (0.1 to 1 percent) that nobody can reproduce. Cause: Node.js default keep-alive timeout is 5 seconds; the backend closes an idle connection exactly when the ALB reuses it. Fix: set keep-alive timeout above 60 seconds on the application server.</p>
+
+<h3 id="m2-4">2.4 Network Load Balancer (NLB)  - Production importance: High (when used)</h3>
+<ul>
+  <li>Layer 4: forwards TCP, UDP, or TLS connections without inspecting HTTP. Handles millions of requests per second with very low latency.</li>
+  <li>One static IP per AZ, optionally your own Elastic IPs. Useful when customers must allow-list your IPs.</li>
+  <li>Client IP preservation: with instance targets, the target sees the real client IP. This means the EC2 security group must allow the client IP ranges (or 0.0.0.0/0), not just the NLB. This surprises many people.</li>
+  <li>Proxy Protocol v2 can pass client IP information when preservation is not possible.</li>
+  <li>Security groups on NLB are supported but must be associated at creation time; you cannot add them later to an NLB created without one.</li>
+  <li>TLS listener: NLB can terminate TLS with an ACM certificate, or use a TCP listener for TLS pass-through so the backend handles certificates (needed for end-to-end mTLS by the app).</li>
+  <li>Cross-zone load balancing is off by default on NLB (see 2.11).</li>
+  <li>Health checks can be TCP, HTTP, or HTTPS.</li>
+</ul>
+<p>Common live issue: NLB created, targets show healthy, but clients time out. Cause: client IP preservation is on, and web-sg only allows traffic from the VPC CIDR. Health checks pass because they come from NLB private IPs inside the VPC. Fix: allow client CIDRs on the instance security group, or attach a security group to the NLB at creation and reference it.</p>
+
+<h3 id="m2-5">2.5 ALB vs NLB - decision guide</h3>
+<table>
+  <tr><th>Need</th><th>Choose</th></tr>
+  <tr><td>HTTP/HTTPS web app or REST API</td><td>ALB</td></tr>
+  <tr><td>Path or host based routing, redirects, authentication, WAF</td><td>ALB</td></tr>
+  <tr><td>Static IPs or Elastic IPs</td><td>NLB (or NLB in front of ALB)</td></tr>
+  <tr><td>Non-HTTP TCP or UDP (game servers, MQTT, databases, SMTP, DNS)</td><td>NLB</td></tr>
+  <tr><td>Extreme throughput, sudden spikes without pre-warming</td><td>NLB</td></tr>
+  <tr><td>PrivateLink endpoint service to share your app with other VPCs or accounts</td><td>NLB</td></tr>
+  <tr><td>gRPC with HTTP/2 routing</td><td>ALB</td></tr>
+</table>
+
+<h3 id="m2-6">2.6 Target groups  - Production importance: Critical</h3>
+<p>A target group is a named pool of backends plus the rules for checking them and sending traffic to them. Listeners and rules forward to target groups; Auto Scaling groups attach to target groups.</p>
+<p>Key settings:</p>
+<ul>
+  <li>Target type: instance (EC2 instance IDs), ip (private IPs, including on-premises over VPN/Direct Connect), lambda (ALB only), alb (NLB only). Cannot be changed after creation.</li>
+  <li>Protocol and port: the port traffic is sent to on the target, for example HTTP 80 or HTTP 8080.</li>
+  <li>Health check settings (section 2.8).</li>
+  <li>Attributes: deregistration delay, stickiness, slow start duration, load balancing algorithm, cross-zone setting.</li>
+</ul>
+<p>Slow start: newly registered targets receive a linearly increasing share of traffic over 30 to 900 seconds. Useful for apps with cold caches or JIT warmup (Java).</p>
+<p>Weighted target groups: one forward action can split traffic between target groups by weight, for example 90/10. This is the basis for blue/green and canary deployments on ALB.</p>
+<p>Take care in live:</p>
+<ul>
+  <li>Use one target group per service or per deployment colour. Do not share a target group between unrelated apps.</li>
+  <li>Name target groups clearly (env-app-port), because target group names are limited to 32 characters and appear in alarms.</li>
+  <li>Watch the metrics HealthyHostCount, UnHealthyHostCount, TargetResponseTime, RequestCountPerTarget, HTTPCode_Target_5XX_Count.</li>
+</ul>
+
+<h3 id="m2-7">2.7 EC2 as a target</h3>
+<ul>
+  <li>With target type instance, the load balancer sends traffic to the primary private IP of the instance's primary network interface, on the target group port (or a per-target port override).</li>
+  <li>The instance must be in the same VPC as the target group. Instances in peered VPCs or on-premises require target type ip.</li>
+  <li>The instance security group must allow the target port and health check port from the load balancer security group (ALB) or from the relevant sources (NLB).</li>
+  <li>Manual registration: register-targets / deregister-targets. With Auto Scaling, registration is automatic (section 6.2).</li>
+  <li>The same instance can be registered on multiple ports (useful for containers with dynamic port mapping).</li>
+  <li>Instances do not need public IPs. They should be in private subnets with outbound access via NAT Gateway or VPC endpoints for package installs and AWS APIs.</li>
+</ul>
+<pre>aws elbv2 register-targets --target-group-arn $TG_ARN --targets Id=i-0abc123 Id=i-0def456
+aws elbv2 describe-target-health --target-group-arn $TG_ARN</pre>
+<p>Target states you will see: initial (registration in progress, health checks running), healthy, unhealthy, unused (target not in an enabled AZ, or target group not attached to a listener), draining (deregistering), unavailable (health checks disabled).</p>
+<p>Common live issue: target stuck in "unused". Cause: the instance is in an AZ that is not enabled on the load balancer, or the target group is not used by any listener rule. Fix: add a subnet in that AZ to the load balancer, or attach the target group to a listener.</p>
+
+<h3 id="m2-8">2.8 Load balancer health checks  - Production importance: Critical</h3>
+<p>The load balancer periodically calls each target and decides whether it is healthy. Unhealthy targets stop receiving new requests.</p>
+<table>
+  <tr><th>Setting</th><th>ALB default</th><th>Typical production value</th></tr>
+  <tr><td>Protocol / port</td><td>HTTP, traffic-port</td><td>HTTP, traffic-port</td></tr>
+  <tr><td>Path</td><td>/</td><td>/health (lightweight dedicated endpoint)</td></tr>
+  <tr><td>Interval</td><td>30 s</td><td>10 to 15 s</td></tr>
+  <tr><td>Timeout</td><td>5 s</td><td>5 s (must be less than interval)</td></tr>
+  <tr><td>Healthy threshold</td><td>5</td><td>2 to 3</td></tr>
+  <tr><td>Unhealthy threshold</td><td>2</td><td>2 to 3</td></tr>
+  <tr><td>Success codes</td><td>200</td><td>200 (or 200-299)</td></tr>
+</table>
+<p>Time to detect failure is about interval multiplied by unhealthy threshold. Time for a new instance to start receiving traffic is about interval multiplied by healthy threshold. With defaults, a new instance waits 150 seconds after the app is up before getting traffic.</p>
+<p>Shallow vs deep health checks:</p>
+<ul>
+  <li>Shallow (liveness): returns 200 if the process can serve HTTP. Recommended for the load balancer health check.</li>
+  <li>Deep (readiness with dependencies): also checks the database, cache, and downstream APIs. Dangerous as a load balancer health check, because one dependency outage marks every instance unhealthy at the same time.</li>
+</ul>
+<p>Fail open: if every target in a target group is unhealthy, ALB routes traffic to all of them anyway (because sending to possibly-broken targets is better than sending to none). Do not rely on this; it means your alarms should already be firing.</p>
+<p>Common live issue (classic outage): the /health endpoint checks database connectivity. The database has a 30 second failover. All instances fail health checks. If the Auto Scaling group uses ELB health checks, it terminates every instance and launches new ones, which also fail, so the app stays down long after the database recovers. Fix: keep the load balancer health check shallow; report dependency status on a separate endpoint for monitoring; use circuit breakers in the app.</p>
+<p>Other common health check issues:</p>
+<ul>
+  <li>Health check path redirects to /login (HTTP 302). Default matcher is 200, so targets are unhealthy. Fix: dedicated /health path that returns 200 without authentication.</li>
+  <li>App only allows certain Host headers (Django ALLOWED_HOSTS, Spring, nginx server_name). Health checks use the target's IP as the Host header and get 400. Fix: allow the private IP or exempt the health path.</li>
+  <li>Security group allows port 80 but the health check uses port 8081. Fix: allow the health check port from alb-sg.</li>
+  <li>Heavy health check endpoint (renders a full page) adds measurable load. With many load balancer nodes, each node checks each target independently, so health check traffic is higher than you expect.</li>
+</ul>
+
+<h3 id="m2-9">2.9 Connection draining (deregistration delay)  - Production importance: High</h3>
+<p>Connection draining is the Classic Load Balancer name; on ALB and NLB it is called deregistration delay. When a target is deregistered (scale in, instance refresh, manual), the load balancer stops sending it new requests but lets in-flight requests finish for up to the delay period. The target is in the draining state.</p>
+<ul>
+  <li>Default: 300 seconds. Range 0 to 3600.</li>
+  <li>Set it slightly longer than your longest normal request. For a typical API with requests under 10 seconds, 30 to 60 seconds is common.</li>
+  <li>Too long: deployments and scale-in are slow; instances you are paying for sit draining for 5 minutes each.</li>
+  <li>Too short: long uploads, reports, or WebSocket connections are cut, causing user-visible errors during every deployment.</li>
+  <li>Auto Scaling waits for deregistration to complete before terminating the instance.</li>
+  <li>The application should also handle SIGTERM gracefully: stop accepting new work, finish current work, then exit.</li>
+</ul>
+<pre>aws elbv2 modify-target-group-attributes --target-group-arn $TG_ARN \
+  --attributes Key=deregistration_delay.timeout_seconds,Value=60</pre>
+<p>Common live issue: "every deployment causes a burst of 502s". Cause: deregistration delay set to 0 by someone trying to speed up deployments, or the app process is killed before draining ends. Fix: restore a sensible delay, and use a lifecycle hook on termination if the app needs extra shutdown time (section 5.1).</p>
+
+<h3 id="m2-10">2.10 Sticky sessions (session affinity)  - Production importance: Medium</h3>
+<p>Stickiness binds a client to the same target for a period, using a cookie.</p>
+<ul>
+  <li>Duration-based (load balancer generated cookie, named AWSALB): duration 1 second to 7 days, default 1 day.</li>
+  <li>Application-based: your app sets its own cookie; the ALB generates AWSALBAPP to track it. Use when the app controls session lifetime.</li>
+  <li>NLB stickiness is based on source IP, not cookies.</li>
+  <li>If the sticky target becomes unhealthy or is deregistered, the client is moved to another target (and loses any local session data).</li>
+  <li>Clients must support cookies. API clients and mobile apps often do not send cookies back, so stickiness silently does nothing.</li>
+</ul>
+<pre>aws elbv2 modify-target-group-attributes --target-group-arn $TG_ARN \
+  --attributes Key=stickiness.enabled,Value=true Key=stickiness.type,Value=lb_cookie \
+               Key=stickiness.lb_cookie.duration_seconds,Value=3600</pre>
+<p>Take care in live: stickiness is a workaround for stateful apps, not a design goal. It causes uneven load and reduces the benefit of scaling out, because existing users stay on old instances while new instances only get new users.</p>
+<p>Common live issue: after scale-out under heavy load, CPU on the original instances stays at 90 percent while new instances sit at 10 percent. Cause: long stickiness duration. Fix: shorter duration, or move sessions to a shared store and disable stickiness.</p>
+
+<h3 id="m2-11">2.11 Cross-zone load balancing  - Production importance: High</h3>
+<p>A load balancer has a node in each enabled AZ. DNS returns IPs of all nodes, so clients spread roughly evenly across nodes.</p>
+<ul>
+  <li>Cross-zone on: each node distributes traffic across all registered targets in all AZs.</li>
+  <li>Cross-zone off: each node only sends to targets in its own AZ.</li>
+</ul>
+<p>Example: AZ-a has 2 instances, AZ-b has 8 instances. Each AZ node gets 50 percent of traffic.</p>
+<ul>
+  <li>Off: each AZ-a instance gets 25 percent, each AZ-b instance gets 6.25 percent. AZ-a instances overload.</li>
+  <li>On: each instance gets 10 percent.</li>
+</ul>
+<table>
+  <tr><th></th><th>ALB</th><th>NLB / GWLB</th></tr>
+  <tr><td>Default</td><td>On at the load balancer level (can be turned off per target group)</td><td>Off</td></tr>
+  <tr><td>Inter-AZ data charge</td><td>No charge</td><td>Charged when enabled</td></tr>
+</table>
+<pre># NLB: enable cross-zone
+aws elbv2 modify-load-balancer-attributes --load-balancer-arn $NLB_ARN \
+  --attributes Key=load_balancing.cross_zone.enabled,Value=true</pre>
+<p>Common live issue: NLB with cross-zone off, and the Auto Scaling group became unbalanced after an AZ capacity shortage (3 instances in one AZ, 1 in another). The single instance gets overloaded and fails health checks, which makes it worse. Fix: enable cross-zone, or ensure the ASG keeps AZs balanced, and use multiple instance types to avoid capacity shortages.</p>
+
+<h3 id="m2-12">2.12 TLS termination  - Production importance: Critical</h3>
+<p>TLS termination means the load balancer decrypts HTTPS traffic using a certificate, so instances do not need to handle certificates.</p>
+<ul>
+  <li>Certificates: use AWS Certificate Manager (ACM). Public ACM certificates are free and renew automatically if validated via DNS (CNAME record in Route 53). Imported certificates do not auto-renew.</li>
+  <li>HTTPS listener on 443 with a certificate and a security policy. Use a modern policy that supports TLS 1.3 and 1.2, for example ELBSecurityPolicy-TLS13-1-2-2021-06 (check the current recommended policy in the docs).</li>
+  <li>SNI: one HTTPS listener can serve many certificates (many domains); the ALB picks based on the host name the client requests.</li>
+  <li>HTTP listener on 80 should only redirect to HTTPS (HTTP 301).</li>
+  <li>Backend encryption options:
+    <ul>
+      <li>Termination only: ALB to EC2 over HTTP inside the VPC. Common and acceptable for many workloads.</li>
+      <li>Re-encryption: ALB to EC2 over HTTPS (target group protocol HTTPS). Required by many compliance standards. The ALB does not validate the target certificate, so a self-signed certificate on the instance works.</li>
+      <li>Pass-through: NLB TCP listener on 443, the instance terminates TLS. Needed when the app must see the client certificate or keys must never leave the instance.</li>
+    </ul>
+  </li>
+  <li>Mutual TLS (client certificates): ALB supports mTLS with a trust store, in verify mode or pass-through mode.</li>
+  <li>The app should use the X-Forwarded-Proto header to know the original request was HTTPS (for redirects and secure cookies).</li>
+</ul>
+<pre># HTTPS listener
+aws elbv2 create-listener --load-balancer-arn $ALB_ARN --protocol HTTPS --port 443 \
+  --certificates CertificateArn=$CERT_ARN \
+  --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06 \
+  --default-actions Type=forward,TargetGroupArn=$TG_ARN
+
+# HTTP to HTTPS redirect
+aws elbv2 create-listener --load-balancer-arn $ALB_ARN --protocol HTTP --port 80 \
+  --default-actions '[{"Type":"redirect","RedirectConfig":{"Protocol":"HTTPS","Port":"443","StatusCode":"HTTP_301"}}]'</pre>
+<p>Common live issues:</p>
+<ul>
+  <li>Certificate expiry outage: an imported certificate (bought from a third party) expired because nobody owned renewal. Fix: use ACM-issued certificates with DNS validation, or alarm on the ACM DaysToExpiry metric and the AWS Health / EventBridge expiry events.</li>
+  <li>ACM certificate stuck in "pending renewal": the DNS validation CNAME was deleted during a DNS cleanup. Fix: never delete the _acme style validation CNAME records ACM created.</li>
+  <li>Infinite redirect loop: the app redirects HTTP to HTTPS itself, but sees HTTP from the ALB (because of termination). Fix: the app must trust X-Forwarded-Proto.</li>
+  <li>Old clients fail after tightening the TLS policy (legacy Android, old Java clients, IoT devices). Fix: check the ALB access logs for TLS protocol and cipher fields before changing the policy.</li>
+</ul>
+
+<h3 id="m2-labs">2.13 Module 2 labs</h3>
+<p>Lab 2A - Manual ALB with two instances</p>
+<ol>
+  <li>Launch 2 EC2 instances (t3.micro, Amazon Linux 2023) in 2 different AZs using the user data from Module 0, security group web-sg, role web-ec2-role.</li>
+  <li>Create target group web-tg: target type instance, HTTP 80, health check path /health, interval 15, healthy threshold 3, unhealthy threshold 2.</li>
+  <li>Register both instances. Watch the state change from initial to healthy.</li>
+  <li>Create internet-facing ALB web-alb in 2 public subnets with alb-sg. Listener HTTP 80 forwarding to web-tg.</li>
+  <li>Open the ALB DNS name in a browser and refresh repeatedly. Confirm the instance ID and AZ alternate.</li>
+</ol>
+<pre>VPC_ID=vpc-xxxx
+TG_ARN=$(aws elbv2 create-target-group --name web-tg --protocol HTTP --port 80 \
+  --vpc-id $VPC_ID --target-type instance --health-check-path /health \
+  --health-check-interval-seconds 15 --healthy-threshold-count 3 --unhealthy-threshold-count 2 \
+  --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+ALB_ARN=$(aws elbv2 create-load-balancer --name web-alb --type application --scheme internet-facing \
+  --subnets subnet-pub-a subnet-pub-b --security-groups sg-alb \
+  --query 'LoadBalancers[0].LoadBalancerArn' --output text)
+
+aws elbv2 create-listener --load-balancer-arn $ALB_ARN --protocol HTTP --port 80 \
+  --default-actions Type=forward,TargetGroupArn=$TG_ARN
+
+for i in $(seq 1 10); do curl -s http://$(aws elbv2 describe-load-balancers --load-balancer-arns $ALB_ARN --query 'LoadBalancers[0].DNSName' --output text)/; done</pre>
+
+<p>Lab 2B - Break the health check</p>
+<ol>
+  <li>On one instance (connect via Session Manager), run: sudo rm /usr/share/nginx/html/health</li>
+  <li>Time how long until the target shows unhealthy. Compare with interval multiplied by unhealthy threshold.</li>
+  <li>Confirm the browser only shows the healthy instance.</li>
+  <li>Restore the file and time how long it takes to become healthy again.</li>
+  <li>Now remove the health file from both instances. Observe fail-open behaviour: traffic still reaches both.</li>
+</ol>
+
+<p>Lab 2C - Stickiness and deregistration delay</p>
+<ol>
+  <li>Enable duration-based stickiness for 60 seconds. Refresh the browser; you should stay on one instance. Use curl without a cookie jar and observe that curl is not sticky.</li>
+  <li>Set deregistration delay to 30 seconds. Deregister one instance and watch it go through draining.</li>
+  <li>Run a long request during draining: add a slow endpoint (for example, a PHP or Python script that sleeps 45 seconds) and observe that requests longer than the delay are cut.</li>
+</ol>
+
+<p>Lab 2D - HTTPS (requires a domain in Route 53; skip if you do not have one)</p>
+<ol>
+  <li>Request an ACM public certificate for app.yourdomain.com with DNS validation; let ACM create the Route 53 records.</li>
+  <li>Add an HTTPS 443 listener with the certificate and a TLS 1.3 policy. Change the port 80 listener to redirect to HTTPS.</li>
+  <li>Create a Route 53 alias A record pointing to the ALB.</li>
+  <li>Check with: curl -vI https://app.yourdomain.com and confirm the TLS version.</li>
+</ol>
+
+<h3>2.14 Module 2 assignments</h3>
+<ol>
+  <li>Write a one-page comparison of ALB and NLB for your own project or a project you know. Justify the choice.</li>
+  <li>Add a listener rule so that /api/* goes to a second target group (api-tg) with a different instance, and everything else goes to web-tg. Add a fixed-response rule for /maintenance returning 503 with a custom message.</li>
+  <li>Calculate: with interval 10 s, unhealthy threshold 3, healthy threshold 2, how long does it take to stop traffic to a broken instance, and how long before a fixed instance receives traffic again?</li>
+  <li>Enable ALB access logs to an S3 bucket. Generate traffic and find these fields in a log line: client IP, target IP, request processing time, target processing time, ELB status code, target status code.</li>
+  <li>Design question: your customer requires a fixed IP to allow-list, but you need path-based routing. Draw the architecture.</li>
+</ol>
+
+
+<!-- ============================================================ -->
+<h2 id="m3">Module 3 - Auto Scaling fundamentals</h2>
+
+<h3 id="m3-1">3.1 What is Auto Scaling?</h3>
+<p>Amazon EC2 Auto Scaling automatically maintains and adjusts the number of EC2 instances in a group. It does three jobs:</p>
+<ul>
+  <li>Fleet management: keeps the number of running, healthy instances equal to the desired capacity. If an instance dies, it is replaced. This is valuable even with a fixed size (min = max = desired).</li>
+  <li>Dynamic scaling: changes desired capacity based on metrics (CPU, requests, queue depth).</li>
+  <li>Scheduled and predictive scaling: changes capacity based on time or forecasts.</li>
+</ul>
+<p>Other related services, so you do not confuse them: AWS Auto Scaling (a console for scaling plans across services), Application Auto Scaling (scales ECS services, DynamoDB, Aurora replicas, Lambda concurrency, etc.). This guide is about EC2 Auto Scaling.</p>
+<p>Auto Scaling has no extra charge.</p>
+
+<h3 id="m3-2">3.2 Launch template  - Production importance: Critical</h3>
+<p>A launch template is the blueprint for instances the Auto Scaling group launches: AMI, instance type, key pair, security groups, IAM instance profile, user data, EBS volumes, network settings, metadata options, tags, and more.</p>
+<ul>
+  <li>Versioned: each change creates a new version. There is a Default version and a Latest version.</li>
+  <li>The ASG can reference a specific version number, $Default, or $Latest.</li>
+  <li>Supports features launch configurations do not: mixed instance types and purchase options (On-Demand plus Spot), multiple network interfaces, capacity reservations, placement groups, T2/T3 unlimited, dedicated hosts, IMDSv2 enforcement, and instance refresh rollback.</li>
+  <li>The AMI can be an SSM parameter reference (resolve:ssm:parameter-name), so the template picks up the latest AMI published to that parameter at launch time.</li>
+</ul>
+<p>Example template data (lt.json):</p>
+<pre>{
+  "ImageId": "resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64",
+  "InstanceType": "t3.micro",
+  "SecurityGroupIds": ["sg-web"],
+  "IamInstanceProfile": { "Name": "web-ec2-role" },
+  "MetadataOptions": { "HttpTokens": "required", "HttpEndpoint": "enabled", "HttpPutResponseHopLimit": 2 },
+  "Monitoring": { "Enabled": true },
+  "UserData": "BASE64_OF_USER_DATA_SCRIPT",
+  "TagSpecifications": [
+    { "ResourceType": "instance", "Tags": [ { "Key": "Name", "Value": "web" }, { "Key": "env", "Value": "lab" } ] },
+    { "ResourceType": "volume",   "Tags": [ { "Key": "env", "Value": "lab" } ] }
+  ]
+}</pre>
+<pre>base64 -w0 userdata.sh   # paste output into UserData
+aws ec2 create-launch-template --launch-template-name web-lt \
+  --version-description v1 --launch-template-data file://lt.json
+
+# new version that changes only the instance type, based on version 1
+aws ec2 create-launch-template-version --launch-template-name web-lt \
+  --source-version 1 --version-description v2-t3small \
+  --launch-template-data '{"InstanceType":"t3.small"}'</pre>
+<p>Take care in live:</p>
+<ul>
+  <li>Version strategy: if the ASG uses $Latest, anyone who creates a new template version changes what future scale-out events launch, without a deployment. Many teams prefer a specific version number (or $Default) and roll forward deliberately with instance refresh.</li>
+  <li>Enforce IMDSv2 (HttpTokens required). Set hop limit 2 if containers on the instance need metadata.</li>
+  <li>Do not put secrets in user data; it is readable by anyone with ec2:DescribeInstanceAttribute and from inside the instance. Fetch secrets from Secrets Manager at boot.</li>
+  <li>Encrypt EBS volumes (account-level default encryption is the simplest).</li>
+  <li>Prefer baked AMIs (built with EC2 Image Builder or Packer) over long user data scripts. Faster boot means faster scaling and less dependence on external package repositories.</li>
+</ul>
+<p>Common live issue: a scale-out event during peak traffic fails with launch errors. Cause: the launch template references an AMI that was deregistered during a cleanup, or a security group that was deleted. The ASG had been running fine for months because it never needed to launch. Fix: protect AMIs used by live templates, alarm on failed launches (EventBridge event "EC2 Instance Launch Unsuccessful"), and periodically test scaling.</p>
+
+<h3 id="m3-3">3.3 Launch configuration (legacy)  - Production importance: Low (migrate away)</h3>
+<ul>
+  <li>The older, non-versioned blueprint. It cannot be modified; you create a new one and switch the ASG to it.</li>
+  <li>AWS has deprecated launch configurations. No support for instance types released after 31 December 2022, and new accounts cannot create them. Many newer features (mixed instances, Spot allocation strategies, instance refresh rollback, IMDSv2 defaults) need launch templates.</li>
+  <li>What you need to know: recognise them in older environments and migrate. The console has a "Copy to launch template" action, and you then update the ASG to use the new launch template. Follow with an instance refresh if you want existing instances replaced.</li>
+</ul>
+<table>
+  <tr><th>Feature</th><th>Launch configuration</th><th>Launch template</th></tr>
+  <tr><td>Versioning</td><td>No</td><td>Yes</td></tr>
+  <tr><td>Modify after creation</td><td>No</td><td>New version</td></tr>
+  <tr><td>Mixed instance types / Spot mix</td><td>No</td><td>Yes</td></tr>
+  <tr><td>Newest instance types</td><td>No</td><td>Yes</td></tr>
+  <tr><td>Usable with plain EC2 RunInstances</td><td>No</td><td>Yes</td></tr>
+  <tr><td>Status</td><td>Deprecated</td><td>Recommended</td></tr>
+</table>
+
+<h3 id="m3-4">3.4 Auto Scaling group (ASG)</h3>
+<p>An ASG is a logical group of EC2 instances managed as a unit. Its key properties:</p>
+<ul>
+  <li>Launch template (and version) or mixed instances policy.</li>
+  <li>VPC subnets (one or more per AZ) - the ASG spreads instances across them.</li>
+  <li>Capacity: minimum, desired, maximum.</li>
+  <li>Health check type (EC2, ELB, and others) and health check grace period.</li>
+  <li>Attached load balancer target groups.</li>
+  <li>Scaling policies, scheduled actions, lifecycle hooks, warm pool.</li>
+  <li>Termination policies, instance maintenance policy, default instance warmup, capacity rebalancing for Spot.</li>
+  <li>Tags (optionally propagated to instances).</li>
+</ul>
+<p>Mixed instances policy (Production importance: High): specify several instance types (for example m6i.large, m5.large, m6a.large, m7i.large) and an On-Demand / Spot split. This reduces the risk of "InsufficientInstanceCapacity" in one AZ and lowers cost. Attribute-based instance type selection lets you specify vCPU and memory ranges instead of naming types.</p>
+<pre>aws autoscaling create-auto-scaling-group --auto-scaling-group-name web-asg \
+  --launch-template LaunchTemplateName=web-lt,Version='$Default' \
+  --min-size 2 --desired-capacity 2 --max-size 6 \
+  --vpc-zone-identifier "subnet-priv-a,subnet-priv-b" \
+  --target-group-arns $TG_ARN \
+  --health-check-type ELB --health-check-grace-period 120 \
+  --default-instance-warmup 120 \
+  --tags Key=env,Value=lab,PropagateAtLaunch=true</pre>
+
+<h3 id="m3-5">3.5 Minimum, desired, and maximum capacity  - Production importance: Critical</h3>
+<ul>
+  <li>Minimum capacity: the group never goes below this. It is your guaranteed baseline for availability. Scaling policies cannot scale in below it.</li>
+  <li>Desired capacity: the number the ASG is trying to run right now. Scaling policies and scheduled actions change this number. If actual differs from desired, the ASG launches or terminates to match.</li>
+  <li>Maximum capacity: the group never goes above this (except briefly during AZ rebalancing or instance refresh with max healthy percentage above 100). It is your cost and blast-radius ceiling.</li>
+  <li>Rule: min less than or equal to desired, desired less than or equal to max.</li>
+</ul>
+<p>How to choose values in production:</p>
+<ul>
+  <li>Minimum: enough to serve normal traffic if one AZ is lost. With 2 AZs, minimum should be at least 2 (one per AZ). For critical services, size minimum so that the remaining AZs can carry normal load while the ASG backfills: for example, if normal load needs 4 instances and you use 2 AZs, losing one AZ leaves half the fleet, so a conservative minimum is 8 (4 per AZ). With 3 AZs the same goal needs only 6 (2 per AZ), which is one reason 3 AZs are cheaper for high availability.</li>
+  <li>Maximum: high enough for the worst realistic spike, low enough to cap runaway cost (for example, a bug causing CPU loops would otherwise scale you to hundreds of instances). Check that the account EC2 vCPU service quota allows the maximum.</li>
+  <li>Desired: if you manage the ASG with Terraform or CloudFormation, avoid hard-coding desired capacity, or configure the tool to ignore changes to it. Otherwise every infrastructure deploy resets desired capacity to the template value, possibly scaling in a fleet that is handling peak traffic.</li>
+</ul>
+<p>Common live issue: during a traffic spike, the ASG stays at 10 instances while CPU is at 95 percent. Cause: max capacity was 10, set years ago. The scaling activity history shows "at maximum capacity". Fix: alarm when GroupDesiredCapacity equals GroupMaxSize, and review max capacity quarterly.</p>
+<p>Common live issue: a Terraform apply during business hours set desired capacity from 14 back to 2. Cause: desired_capacity hard-coded. Fix: lifecycle ignore_changes on desired_capacity, or omit it.</p>
+
+<h3 id="m3-6">3.6 Multi-AZ Auto Scaling  - Production importance: Critical</h3>
+<ul>
+  <li>Give the ASG subnets in at least 2, preferably 3, AZs. The ASG tries to keep the number of instances balanced across AZs.</li>
+  <li>AZ rebalancing: if the group becomes unbalanced (an AZ had no capacity, or you manually terminated instances), the ASG launches new instances in the under-populated AZ first and then terminates in the over-populated AZ. During this it can temporarily exceed max capacity by up to 10 percent (or 1 instance).</li>
+  <li>If an AZ fails, the ASG launches replacement instances in the remaining AZs.</li>
+  <li>The load balancer must have subnets in the same AZs as the ASG, otherwise targets are "unused".</li>
+  <li>Capacity rebalancing (Spot): proactively replaces Spot instances that receive a rebalance recommendation.</li>
+  <li>For EC2 in private subnets, deploy one NAT Gateway per AZ. A single NAT Gateway in one AZ means an AZ failure breaks outbound access for every instance.</li>
+</ul>
+<p>Common live issue: one AZ runs out of the requested instance type (InsufficientInstanceCapacity). The ASG keeps trying, launching extra instances in other AZs, leaving the fleet unbalanced. Fix: use a mixed instances policy with 3 or more similar instance types, and use 3 AZs.</p>
+<p>Common live issue: AZ rebalancing terminates instances in the middle of long jobs. Fix: use scale-in protection on busy instances, or suspend the AZRebalance process for workloads that cannot tolerate it (and understand the trade-off).</p>
+
+<h3 id="m3-7">3.7 Auto Scaling health checks  - Production importance: Critical</h3>
+<p>The ASG decides whether each instance is healthy, separate from the load balancer's view. Health check sources:</p>
+<ul>
+  <li>EC2 (always on): instance state must be running, and EC2 system and instance status checks must pass. Detects hardware failure, kernel panic, stopped instances. Does not detect a crashed application.</li>
+  <li>ELB (opt-in): if the target group reports the instance unhealthy, the ASG marks it unhealthy. Detects application failures. Recommended for instances behind a load balancer.</li>
+  <li>EBS (opt-in): detects impaired EBS volumes.</li>
+  <li>VPC Lattice (opt-in): when using VPC Lattice target groups.</li>
+  <li>Custom: your monitoring calls set-instance-health to mark an instance unhealthy.</li>
+</ul>
+<p>Health check grace period: after an instance enters the InService state, the ASG waits this long before acting on failed health checks. The console default is 300 seconds; when created through the CLI or API the default is 0. Set it to the time your instance needs from launch to passing health checks, with some margin.</p>
+<pre>aws autoscaling update-auto-scaling-group --auto-scaling-group-name web-asg \
+  --health-check-type ELB --health-check-grace-period 180
+
+# custom health signal from your monitoring
+aws autoscaling set-instance-health --instance-id i-0abc123 --health-status Unhealthy</pre>
+<p>Common live issue (replacement loop): instances are launched, then terminated after 2 to 3 minutes, over and over. The ASG activity history shows "an instance was taken out of service in response to an ELB system health check failure". Cause: the application takes 6 minutes to start (large Java app, big user data script), but the grace period is 120 seconds. Fix: increase the grace period, speed up boot by baking the AMI, or use a launch lifecycle hook so the instance only goes InService when ready.</p>
+<p>Common live issue: the ASG uses only EC2 health checks. The application process crashed on one instance; the load balancer stopped routing to it, but the ASG keeps it running forever because the EC2 status checks pass. Capacity is silently reduced. Fix: enable ELB health checks on the ASG.</p>
+
+<h3 id="m3-8">3.8 Replacement of unhealthy instances</h3>
+<ul>
+  <li>Once an instance is marked unhealthy, the ASG schedules it for replacement. It terminates the unhealthy instance and launches a new one to restore desired capacity.</li>
+  <li>The instance maintenance policy controls order and capacity during replacement: minimum healthy percentage (for example 100 means launch the replacement before terminating), and maximum healthy percentage (for example 110 allows extra capacity during replacement). Without a policy, the default is terminate then launch.</li>
+  <li>Unhealthy instances are not repaired or rebooted. They are replaced. That is why instances must be disposable.</li>
+  <li>Scale-in protection does not protect an instance from health replacement.</li>
+  <li>Termination lifecycle hooks still run, which lets you collect logs from the failing instance before it disappears.</li>
+  <li>The ReplaceUnhealthy and HealthCheck processes can be suspended, which stops this behaviour. Useful for debugging, dangerous if forgotten.</li>
+</ul>
+<pre>aws autoscaling update-auto-scaling-group --auto-scaling-group-name web-asg \
+  --instance-maintenance-policy MinHealthyPercentage=100,MaxHealthyPercentage=110</pre>
+<p>Common live issue: an engineer suspends ReplaceUnhealthy to debug a broken instance, then forgets. Weeks later, instances fail and are never replaced. Fix: alarm or AWS Config rule on suspended processes; use a ticket or calendar reminder whenever suspending.</p>
+<p>Common live issue: logs from crashed instances are gone, so the root cause is unknown. Fix: ship logs continuously to CloudWatch Logs; add a termination lifecycle hook that uploads diagnostic data to S3.</p>
+
+<h3 id="m3-labs">3.9 Module 3 labs</h3>
+<p>Lab 3A - Launch template and ASG</p>
+<ol>
+  <li>Deregister and terminate the manual instances from Lab 2A (keep the ALB and web-tg).</li>
+  <li>Create launch template web-lt (version 1) with the Module 0 user data and IMDSv2 required.</li>
+  <li>Create ASG web-asg: min 2, desired 2, max 6, two subnets in different AZs, attached to web-tg, health check type ELB, grace period 120 seconds.</li>
+  <li>Verify: 2 instances in 2 AZs, both registered and healthy in web-tg, the ALB DNS name works.</li>
+</ol>
+
+<p>Lab 3B - Self-healing</p>
+<ol>
+  <li>Terminate one instance manually from the EC2 console. Watch the ASG activity history launch a replacement.</li>
+  <li>On another instance, stop nginx (sudo systemctl stop nginx). Watch: target group marks it unhealthy, then the ASG terminates and replaces it. Measure total time.</li>
+  <li>Repeat step 2 with ASG health check type set to EC2 only. Observe that the instance is never replaced. Switch back to ELB.</li>
+</ol>
+
+<p>Lab 3C - Capacity and AZ balance</p>
+<ol>
+  <li>Set desired capacity to 4. Observe the 2 and 2 distribution across AZs.</li>
+  <li>Try to set desired capacity to 8 (above max). Read the error.</li>
+  <li>Terminate both instances in one AZ using the CLI with the option that does not decrement desired capacity. Observe how the ASG replaces them in the same AZ.</li>
+  <li>Set desired back to 2. Note which instances were chosen for termination and compare with the default termination policy (section 5.4).</li>
+</ol>
+<pre>aws autoscaling set-desired-capacity --auto-scaling-group-name web-asg --desired-capacity 4
+aws autoscaling terminate-instance-in-auto-scaling-group --instance-id i-0abc123 --no-should-decrement-desired-capacity
+aws autoscaling describe-scaling-activities --auto-scaling-group-name web-asg --max-items 10</pre>
+
+<h3>3.10 Module 3 assignments</h3>
+<ol>
+  <li>Your app takes 4 minutes to boot. ALB health check interval is 15 s and healthy threshold is 3. What minimum health check grace period would you set? Explain.</li>
+  <li>Create launch template version 2 with instance type t3.small and a modified page saying v2. Without changing the ASG, set desired capacity to 3. Which version does the new instance use if the ASG references $Default? $Latest? Verify by experiment.</li>
+  <li>Write a short policy for your team: who may change min/max, how desired capacity is handled in infrastructure as code, and which processes may be suspended and for how long.</li>
+  <li>Convert the ASG to a mixed instances policy with t3.micro, t3a.micro, and t2.micro, 1 On-Demand base instance, and the remainder 50 percent Spot.</li>
+</ol>
+
+
+<!-- ============================================================ -->
+<h2 id="m4">Module 4 - Scaling policies</h2>
+
+<h3 id="m4-1">4.1 Overview and choosing a policy</h3>
+<table>
+  <tr><th>Policy</th><th>How it decides</th><th>When to use</th></tr>
+  <tr><td>Target tracking</td><td>Keep a metric near a target value (like a thermostat)</td><td>Default choice for most web and API workloads</td></tr>
+  <tr><td>Step scaling</td><td>CloudWatch alarm; different adjustments depending on how far the metric breaches</td><td>Need fine control or fast aggressive reaction to big breaches</td></tr>
+  <tr><td>Simple scaling</td><td>CloudWatch alarm; one fixed adjustment, then wait for cooldown</td><td>Legacy. Prefer step or target tracking.</td></tr>
+  <tr><td>Scheduled scaling</td><td>Change min, max, desired at a given time</td><td>Known patterns: business hours, batch windows, events</td></tr>
+  <tr><td>Predictive scaling</td><td>Machine learning forecast from history; launches capacity ahead of time</td><td>Regular daily or weekly cycles with slow-booting instances</td></tr>
+</table>
+<p>Common production combination: target tracking (handles the unexpected) plus scheduled or predictive scaling (prepares for the expected) plus a sensible minimum capacity.</p>
+
+<h3 id="m4-2">4.2 Scaling based on CloudWatch  - Production importance: High</h3>
+<p>Every dynamic scaling policy is driven by CloudWatch metrics and alarms.</p>
+<ul>
+  <li>EC2 metrics: CPUUtilization, NetworkIn/Out, etc. Basic monitoring sends 5-minute data (free). Detailed monitoring sends 1-minute data (paid) and is recommended for scaling so policies react faster.</li>
+  <li>Memory and disk usage are not provided by default. Install the CloudWatch agent to publish them.</li>
+  <li>ALB metrics: RequestCountPerTarget, TargetResponseTime, HTTPCode_Target_5XX_Count.</li>
+  <li>ASG group metrics: GroupMinSize, GroupMaxSize, GroupDesiredCapacity, GroupInServiceInstances, GroupPendingInstances, GroupTerminatingInstances, GroupTotalInstances, warm pool metrics. They must be enabled on the ASG (free, 1-minute granularity). Enable them; you need them in dashboards.</li>
+  <li>Custom metrics: anything your app publishes, for example active connections, jobs in progress, or queue backlog per instance.</li>
+  <li>Metric math: target tracking can use metric math, for example SQS ApproximateNumberOfMessagesVisible divided by GroupInServiceInstances, which gives "backlog per instance". This is the recommended way to scale queue workers.</li>
+</ul>
+<pre>aws autoscaling enable-metrics-collection --auto-scaling-group-name web-asg --granularity "1Minute"</pre>
+<p>Choosing the right metric:</p>
+<ul>
+  <li>The metric must increase when you need more instances and decrease when you add instances. CPU and request count per target do. Total request count for the whole ALB does not decrease when you add instances, so it is a bad target tracking metric.</li>
+  <li>Latency (TargetResponseTime) is a poor scaling metric on its own because it can rise for reasons more instances do not fix (slow database).</li>
+  <li>For CPU-bound apps use CPU. For IO-bound web apps, request count per target is often better. For workers, backlog per instance.</li>
+</ul>
+<p>Common live issue: scaling policy never triggers. The alarm is in INSUFFICIENT_DATA state. Cause: custom metric dimension mismatch (the app publishes with dimension InstanceId, but the alarm uses AutoScalingGroupName), or the metric stopped publishing after an agent configuration change. Fix: verify the exact namespace, metric name, and dimensions; alarm on INSUFFICIENT_DATA for scaling alarms.</p>
+
+<h3 id="m4-3">4.3 Target tracking scaling  - Production importance: Critical</h3>
+<p>You choose a metric and a target value, for example average CPU at 50 percent. Auto Scaling creates and manages CloudWatch alarms and calculates how many instances are needed to bring the metric back to the target.</p>
+<ul>
+  <li>Predefined metrics: ASGAverageCPUUtilization, ASGAverageNetworkIn, ASGAverageNetworkOut, ALBRequestCountPerTarget. Custom metrics and metric math are also supported.</li>
+  <li>Scale out reacts quickly (alarm on about 3 minutes of breaching data with 1-minute metrics). Scale in is deliberately slower and more conservative (about 15 minutes), to avoid flapping.</li>
+  <li>The alarms are named TargetTracking-...; do not edit or delete them manually. Auto Scaling owns them.</li>
+  <li>Option to disable scale-in: the policy only adds capacity; you remove capacity by schedule or another policy.</li>
+  <li>With multiple target tracking policies, the ASG scales out if any policy wants more, and scales in only if all policies agree.</li>
+  <li>Target values: 50 to 70 percent CPU is typical. Lower targets mean more headroom for sudden spikes and slower scale-out, at a higher cost.</li>
+</ul>
+<pre># CPU target tracking
+aws autoscaling put-scaling-policy --auto-scaling-group-name web-asg \
+  --policy-name cpu-50 --policy-type TargetTrackingScaling \
+  --target-tracking-configuration '{
+    "PredefinedMetricSpecification": { "PredefinedMetricType": "ASGAverageCPUUtilization" },
+    "TargetValue": 50.0
+  }'
+
+# Request count per target (ResourceLabel = app/ALB-name/ALB-id/targetgroup/TG-name/TG-id)
+aws autoscaling put-scaling-policy --auto-scaling-group-name web-asg \
+  --policy-name req-per-target-500 --policy-type TargetTrackingScaling \
+  --target-tracking-configuration '{
+    "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "ALBRequestCountPerTarget",
+      "ResourceLabel": "app/web-alb/1234567890abcdef/targetgroup/web-tg/abcdef1234567890"
+    },
+    "TargetValue": 500.0
+  }'</pre>
+<p>How to find the right request count target: load test a single instance and find the requests per minute at which latency starts degrading. Set the target to about 60 to 70 percent of that number.</p>
+<p>Common live issue: flapping (instances repeatedly added and removed). Cause: target value too close to the natural fluctuation, very short instance warmup, or a metric that drops sharply when instances are added. Fix: set default instance warmup properly, raise or lower the target, or use a less noisy metric.</p>
+
+<h3 id="m4-4">4.4 Step scaling</h3>
+<p>You create a CloudWatch alarm yourself and attach a step scaling policy. The policy defines steps based on how far above or below the alarm threshold the metric is.</p>
+<p>Example: alarm threshold CPU 60 percent.</p>
+<ul>
+  <li>60 to 80 percent (0 to 20 above threshold): add 1 instance.</li>
+  <li>Above 80 percent (20 or more above threshold): add 3 instances.</li>
+</ul>
+<ul>
+  <li>Adjustment types: ChangeInCapacity (add or remove N), ExactCapacity (set to N), PercentChangeInCapacity (add or remove N percent, with MinAdjustmentMagnitude).</li>
+  <li>Step bounds are relative to the alarm threshold, not absolute values. This is the most common source of confusion.</li>
+  <li>Step scaling does not use cooldown; it uses instance warmup. It can continue to respond to new alarm breaches while instances are warming up, but it accounts for warming instances so it does not over-add.</li>
+  <li>You need separate policies and alarms for scale-out and scale-in.</li>
+</ul>
+<pre>POLICY_ARN=$(aws autoscaling put-scaling-policy --auto-scaling-group-name web-asg \
+  --policy-name cpu-step-out --policy-type StepScaling \
+  --adjustment-type ChangeInCapacity --metric-aggregation-type Average \
+  --step-adjustments MetricIntervalLowerBound=0,MetricIntervalUpperBound=20,ScalingAdjustment=1 \
+                     MetricIntervalLowerBound=20,ScalingAdjustment=3 \
+  --query 'PolicyARN' --output text)
+
+aws cloudwatch put-metric-alarm --alarm-name web-asg-cpu-high \
+  --namespace AWS/EC2 --metric-name CPUUtilization --statistic Average \
+  --dimensions Name=AutoScalingGroupName,Value=web-asg \
+  --period 60 --evaluation-periods 2 --threshold 60 \
+  --comparison-operator GreaterThanOrEqualToThreshold \
+  --alarm-actions $POLICY_ARN</pre>
+<p>When to prefer step over target tracking: when you want a specific, explainable reaction (for example "at 90 percent, add 5 immediately"), when scaling on a metric that does not change proportionally with capacity, or when you need asymmetric behaviour.</p>
+
+<h3 id="m4-5">4.5 Simple scaling</h3>
+<ul>
+  <li>One alarm, one adjustment (for example add 1 instance). After the action, the ASG waits for the cooldown period (default 300 seconds) before responding to further alarms of simple policies.</li>
+  <li>Problem: during a fast spike, it adds 1 instance and then waits 5 minutes, adding 1 more, and so on. Too slow.</li>
+  <li>Still exists for backward compatibility. Know it for exams and older environments; use step or target tracking in new designs.</li>
+</ul>
+<p>Common live issue: an old environment uses simple scaling with +1 instance and 300 second cooldown. A marketing campaign multiplies traffic by 5; it takes 40 minutes to reach required capacity, with errors throughout. Fix: replace with target tracking, and use scheduled scaling for known events.</p>
+
+<h3 id="m4-6">4.6 Scheduled scaling  - Production importance: High</h3>
+<ul>
+  <li>A scheduled action sets min, max, and/or desired capacity at a specific time, once or on a recurring cron schedule.</li>
+  <li>Supports a time zone (for example Asia/Kolkata), including daylight saving handling for zones that use it.</li>
+  <li>Dynamic policies continue to work within the new min and max.</li>
+  <li>Use cases: scale up before business hours, scale down at night and weekends (dev and test environments can go to 0), pre-scale for a sale or a known event.</li>
+</ul>
+<pre># weekday morning scale up (IST)
+aws autoscaling put-scheduled-update-group-action --auto-scaling-group-name web-asg \
+  --scheduled-action-name weekday-morning-up --recurrence "30 8 * * 1-5" --time-zone "Asia/Kolkata" \
+  --min-size 4 --max-size 12 --desired-capacity 4
+
+# evening scale down
+aws autoscaling put-scheduled-update-group-action --auto-scaling-group-name web-asg \
+  --scheduled-action-name weekday-evening-down --recurrence "0 21 * * 1-5" --time-zone "Asia/Kolkata" \
+  --min-size 2 --max-size 6
+
+# one-time event
+aws autoscaling put-scheduled-update-group-action --auto-scaling-group-name web-asg \
+  --scheduled-action-name diwali-sale --start-time "2026-11-05T06:00:00Z" \
+  --min-size 10 --max-size 40 --desired-capacity 10</pre>
+<p>Take care in live:</p>
+<ul>
+  <li>Scale up early enough to account for boot time and health checks (for example 30 minutes before the event, not at the exact minute).</li>
+  <li>Raise the minimum, not just desired. If you only set desired, target tracking may scale in again before the traffic arrives.</li>
+  <li>Always pair a scale-up action with a scale-down action, or remember to remove a one-time raised minimum.</li>
+  <li>Cron uses the time zone you specify; without it, UTC is used. Wrong time zone is a classic mistake.</li>
+</ul>
+<p>Common live issue: the evening scale-down action sets min to 1 but a team later raised production min to 3 manually for resilience. Every evening the schedule silently lowers min back to 1. Fix: keep all capacity settings in infrastructure as code, review scheduled actions whenever min/max is changed.</p>
+
+<h3 id="m4-7">4.7 Predictive scaling</h3>
+<ul>
+  <li>Analyses historical load (needs at least 24 hours; uses up to 14 days) and forecasts capacity for the next 48 hours, refreshed regularly.</li>
+  <li>Launches instances ahead of the forecast demand, so capacity is ready before the daily peak. Ideal for slow-booting apps with regular cycles.</li>
+  <li>Modes: forecast only (generate forecasts so you can evaluate accuracy in the console, no scaling) and forecast and scale.</li>
+  <li>Metrics: CPU, network, ALB request count per target, or custom metric pairs (load metric and scaling metric).</li>
+  <li>Scheduling buffer time: how many seconds before the forecast time instances should launch (for example 300 to 600 seconds for apps that take a few minutes to become ready).</li>
+  <li>Max capacity behaviour: can optionally allow the forecast to raise capacity above max by a buffer.</li>
+  <li>Predictive scaling only scales out ahead of time; it does not handle unexpected spikes. Always combine it with target tracking.</li>
+</ul>
+<pre>aws autoscaling put-scaling-policy --auto-scaling-group-name web-asg \
+  --policy-name cpu-predictive --policy-type PredictiveScaling \
+  --predictive-scaling-configuration '{
+    "MetricSpecifications": [ {
+      "TargetValue": 50,
+      "PredefinedMetricPairSpecification": { "PredefinedMetricType": "ASGCPUUtilization" }
+    } ],
+    "Mode": "ForecastOnly",
+    "SchedulingBufferTime": 300
+  }'</pre>
+<p>Take care in live: start in forecast-only mode for at least a week, compare forecast vs actual in the console, then switch to forecast and scale. Do not use it for irregular, event-driven, or newly launched workloads with no history.</p>
+<p>Common live issue: after a one-time event (huge sale day), predictive scaling repeats extra capacity at the same hour on following days because the event is in the history. Fix: review forecasts after unusual events; temporarily switch to forecast only.</p>
+
+<h3 id="m4-8">4.8 Cooldown, warmup, and combining policies  - Production importance: High</h3>
+<ul>
+  <li>Default cooldown (default 300 s): only applies to simple scaling policies. After a simple scaling activity, other simple policies wait.</li>
+  <li>Default instance warmup (recommended to enable on every ASG): the time after an instance is InService before its metrics count toward the group's metrics, and before it is considered as contributing capacity. Used by target tracking, step scaling, and instance refresh. Set it to how long the instance takes to reach steady-state performance (often 60 to 300 seconds).</li>
+  <li>Why warmup matters: a booting instance shows high CPU (installing packages, JIT compiling) or zero requests. Without warmup, these numbers distort the average and cause extra scaling.</li>
+  <li>Multiple policies: if several policies trigger at the same time, the ASG chooses the one that results in the largest capacity, for both scale-out and scale-in. This favours availability.</li>
+  <li>Scheduled actions change min/max/desired; dynamic policies then operate within those limits.</li>
+</ul>
+<p>Common live issue: CPU-based scaling adds 2 instances, then 2 more a minute later, then 2 more, overshooting to max. Cause: new instances run a heavy user data script at 100 percent CPU, which pushes the group average up. No instance warmup configured. Fix: set default instance warmup to boot time plus margin; bake AMIs to reduce boot work.</p>
+
+<h3 id="m4-labs">4.9 Module 4 labs</h3>
+<p>Lab 4A - Target tracking with a CPU load test</p>
+<ol>
+  <li>Enable group metrics collection on web-asg. Set default instance warmup to 120 seconds.</li>
+  <li>Create a target tracking policy: ASGAverageCPUUtilization, target 40.</li>
+  <li>On both instances (Session Manager), generate CPU load: sudo dnf install -y stress-ng then stress-ng --cpu 2 --timeout 900s. Alternative without packages: run "yes &gt; /dev/null &amp;" twice.</li>
+  <li>Watch the TargetTracking alarm move to ALARM, desired capacity increase, and new instances register in web-tg.</li>
+  <li>Stop the load. Measure how long scale-in takes compared to scale-out, and explain why.</li>
+</ol>
+
+<p>Lab 4B - Request count scaling with real HTTP load</p>
+<ol>
+  <li>Replace the CPU policy with ALBRequestCountPerTarget, target 300.</li>
+  <li>From CloudShell or another instance, generate HTTP load: install hey (go install github.com/rakyll/hey@latest) or use ab from the httpd-tools package: ab -n 200000 -c 50 http://ALB-DNS/</li>
+  <li>Observe RequestCountPerTarget in CloudWatch and the scaling activity.</li>
+</ol>
+
+<p>Lab 4C - Step scaling</p>
+<ol>
+  <li>Delete the target tracking policy. Create the step scaling policy and alarm from section 4.4, plus a matching scale-in policy (remove 1 when CPU below 20 percent for 5 minutes).</li>
+  <li>Run stress at different intensities and observe which step is applied.</li>
+</ol>
+
+<p>Lab 4D - Scheduled scaling</p>
+<ol>
+  <li>Create a one-time scheduled action 10 minutes from now that sets min 3 and desired 3. Create another 30 minutes from now that sets min 2 and desired 2.</li>
+  <li>Verify both run. Then create a recurring action using your local time zone.</li>
+  <li>Enable a predictive scaling policy in forecast-only mode and look at the forecast graph the next day.</li>
+</ol>
+
+<h3>4.10 Module 4 assignments</h3>
+<ol>
+  <li>For each workload, choose a scaling metric and policy type and justify: (a) a CPU-heavy image processing API, (b) an SQS queue worker fleet, (c) an internal HR portal used 9 to 6 on weekdays, (d) a news site with unpredictable viral spikes, (e) a ticket booking site with a known sale start at 10:00.</li>
+  <li>Write the target tracking JSON for "SQS backlog per instance = 100" using metric math (ApproximateNumberOfMessagesVisible divided by GroupInServiceInstances).</li>
+  <li>Your step scaling alarm threshold is 70 percent CPU. Write step adjustments for: 70 to 85 add 1, 85 to 95 add 2, above 95 add 4.</li>
+  <li>Explain in your own words why scale-in in target tracking is slower than scale-out, and when you would disable scale-in.</li>
+</ol>
+
+
+<!-- ============================================================ -->
+<h2 id="m5">Module 5 - Advanced Auto Scaling operations</h2>
+
+<h3 id="m5-1">5.1 Lifecycle hooks  - Production importance: High</h3>
+<p>A lifecycle hook pauses an instance during launch or termination so you can run custom actions before it continues.</p>
+<pre>Launch:      Pending --&gt; Pending:Wait --(your action)--&gt; Pending:Proceed --&gt; InService
+Termination: Terminating --&gt; Terminating:Wait --(your action)--&gt; Terminating:Proceed --&gt; Terminated</pre>
+<ul>
+  <li>Transitions: autoscaling:EC2_INSTANCE_LAUNCHING and autoscaling:EC2_INSTANCE_TERMINATING.</li>
+  <li>Heartbeat timeout: how long the instance waits (30 to 7200 seconds, default 3600). Extend with record-lifecycle-action-heartbeat. Overall maximum is 48 hours or 100 heartbeats, whichever is smaller.</li>
+  <li>Default result when the timeout expires: CONTINUE or ABANDON. For launch hooks, ABANDON terminates the instance. For termination hooks, both results continue termination.</li>
+  <li>Complete the action early with complete-lifecycle-action (from the instance itself, a Lambda, or any automation).</li>
+  <li>Notifications: EventBridge (recommended, triggers Lambda or SSM Automation), SNS, or SQS. The instance can also poll its own lifecycle state from instance metadata (autoscaling/target-lifecycle-state).</li>
+  <li>Hooks also apply when instances move in and out of a warm pool.</li>
+</ul>
+<p>Typical uses:</p>
+<ul>
+  <li>Launch: wait until the app has fully started, warmed caches, downloaded models, joined a cluster, or registered in a service discovery system, then complete the action. The instance is registered with the target group only after it goes InService.</li>
+  <li>Termination: upload logs to S3, finish in-progress jobs, deregister from a non-ELB system (Consul, license server, Active Directory), take a final snapshot.</li>
+</ul>
+<pre>aws autoscaling put-lifecycle-hook --auto-scaling-group-name web-asg \
+  --lifecycle-hook-name launch-ready --lifecycle-transition autoscaling:EC2_INSTANCE_LAUNCHING \
+  --heartbeat-timeout 600 --default-result ABANDON
+
+aws autoscaling put-lifecycle-hook --auto-scaling-group-name web-asg \
+  --lifecycle-hook-name drain-logs --lifecycle-transition autoscaling:EC2_INSTANCE_TERMINATING \
+  --heartbeat-timeout 300 --default-result CONTINUE
+
+# at the end of user data, once the app is verified healthy:
+aws autoscaling complete-lifecycle-action --auto-scaling-group-name web-asg \
+  --lifecycle-hook-name launch-ready --instance-id $ID --lifecycle-action-result CONTINUE --region ap-south-1</pre>
+<p>The instance role needs autoscaling:CompleteLifecycleAction for the instance to complete its own hook.</p>
+<p>Take care in live:</p>
+<ul>
+  <li>Use default result ABANDON for launch hooks, so a broken instance that never signals readiness is terminated rather than added to service.</li>
+  <li>Keep the heartbeat timeout realistic. Long timeouts slow every scaling event.</li>
+  <li>Lifecycle hook time counts against scaling speed: a 10-minute launch hook means 10 minutes before new capacity serves traffic.</li>
+</ul>
+<p>Common live issue: scale-out takes an hour. Instances sit in Pending:Wait. Cause: the launch hook's completion call fails silently (missing IAM permission, wrong region in the CLI call, script error before the final line), and the default result is CONTINUE after a 3600 second timeout. Fix: check permissions, log the user data script output (/var/log/cloud-init-output.log), set a sensible heartbeat timeout, and use ABANDON.</p>
+
+<h3 id="m5-2">5.2 Instance refresh  - Production importance: Critical (for deployments)</h3>
+<p>Instance refresh replaces instances in the ASG in a rolling fashion, typically to roll out a new launch template version (new AMI, new instance type, new user data).</p>
+<ul>
+  <li>Minimum healthy percentage (default 90): how much of desired capacity must stay healthy during the refresh. 90 percent with 10 instances means 1 at a time.</li>
+  <li>Maximum healthy percentage (100 to 200): allows launching new instances before terminating old ones. For example min 100, max 110 means always launch first, never reduce capacity. Ideal for production.</li>
+  <li>Instance warmup: wait after a new instance is healthy before counting it and moving on.</li>
+  <li>Checkpoints: pause at given percentages (for example 20 percent and 50 percent) for a set time, to validate before continuing. A built-in canary.</li>
+  <li>Skip matching: do not replace instances that already match the desired configuration.</li>
+  <li>Desired configuration: specify the target launch template version as part of the refresh, so the ASG is updated only if the refresh succeeds.</li>
+  <li>Auto rollback: if the refresh fails or is cancelled, roll back to the previous configuration. Can be triggered by CloudWatch alarms (for example 5xx rate) during the refresh.</li>
+  <li>Instances with scale-in protection or in standby are handled according to preferences (skip, wait, or ignore).</li>
+</ul>
+<pre>aws autoscaling start-instance-refresh --auto-scaling-group-name web-asg \
+  --desired-configuration '{"LaunchTemplate":{"LaunchTemplateName":"web-lt","Version":"2"}}' \
+  --preferences '{
+    "MinHealthyPercentage": 100,
+    "MaxHealthyPercentage": 150,
+    "InstanceWarmup": 120,
+    "SkipMatching": true,
+    "AutoRollback": true,
+    "CheckpointPercentages": [50, 100],
+    "CheckpointDelay": 300,
+    "AlarmSpecification": { "Alarms": ["web-alb-5xx-high"] }
+  }'
+
+aws autoscaling describe-instance-refreshes --auto-scaling-group-name web-asg
+aws autoscaling cancel-instance-refresh --auto-scaling-group-name web-asg
+aws autoscaling rollback-instance-refresh --auto-scaling-group-name web-asg</pre>
+<p>Instance refresh vs other deployment methods:</p>
+<ul>
+  <li>Instance refresh: replaces whole instances (immutable infrastructure). Simple, built in.</li>
+  <li>Blue/green with two ASGs and weighted target groups or CodeDeploy: fastest rollback, more complex and more cost during deployment.</li>
+  <li>In-place deployment (CodeDeploy agent or SSM updating code on running instances): faster but creates drift; new instances launched by scaling must still get the latest code.</li>
+</ul>
+<p>Common live issue: instance refresh stuck at 0 percent for hours. Cause: the new launch template version has a bug, new instances never pass health checks, and the refresh keeps waiting. Or minimum healthy percentage is 100 with maximum healthy percentage 100, so the ASG is not allowed to terminate or add anything. Fix: use alarms and auto rollback, set max healthy above 100, and test the new version in staging.</p>
+<p>Common live issue: the refresh completed, but some instances still run old code. Cause: the ASG still points to the old version while a refresh used a different one, or skip matching was on while the change was only in an SSM parameter value (the template itself did not change). Fix: always use desired configuration with an explicit version.</p>
+
+<h3 id="m5-3">5.3 Warm pools  - Production importance: Medium (High for slow-boot apps)</h3>
+<p>A warm pool is a set of pre-initialized instances kept alongside the ASG. When the ASG scales out, it takes an instance from the warm pool instead of launching from scratch, which cuts scale-out time from minutes to seconds.</p>
+<ul>
+  <li>Pool states: Stopped (cheapest: pay only for EBS and Elastic IPs), Hibernated (memory saved to EBS, faster resume, requires hibernation support), Running (fastest, pay full price).</li>
+  <li>Size: by default the warm pool size is max capacity minus desired capacity. You can set max group prepared capacity and a minimum pool size.</li>
+  <li>Reuse on scale in: instead of terminating instances on scale-in, return them to the warm pool.</li>
+  <li>Lifecycle hooks run when instances enter and leave the pool; the instance can read its target lifecycle state from instance metadata to know whether it is going to Warmed:Stopped or InService.</li>
+  <li>Limitations: not supported with mixed instances policies or Spot instances, and not for instances with instance store root volumes.</li>
+</ul>
+<pre>aws autoscaling put-warm-pool --auto-scaling-group-name web-asg \
+  --pool-state Stopped --min-size 2 --instance-reuse-policy '{"ReuseOnScaleIn": true}'
+aws autoscaling describe-warm-pool --auto-scaling-group-name web-asg</pre>
+<p>Take care in live:</p>
+<ul>
+  <li>The application must handle stop and start: services set to start on boot, no assumptions that boot equals first boot, refresh configuration and credentials on start, cluster membership rejoin.</li>
+  <li>Instances in a warm pool keep the launch template version they were launched with. After changing the template, use instance refresh, which also refreshes warm pool instances.</li>
+  <li>Stopped instances still pay for EBS. A large pool of instances with big volumes adds up.</li>
+</ul>
+<p>Common live issue: instances from the warm pool join the target group but serve errors. Cause: user data ran only at first launch while the instance went to the pool; on resume, the app started with stale configuration or an expired token, or the app was not enabled to start on boot. Fix: separate "initialize" from "start" logic; make the service start on boot; check target lifecycle state in scripts.</p>
+
+<h3 id="m5-4">5.4 Other operational controls</h3>
+<ul>
+  <li>Scale-in protection: mark instances (or set as default for new instances) so they are not chosen during scale-in. Workers can protect themselves while processing a job and remove protection when idle. Does not protect against health replacement or manual termination.</li>
+  <li>Standby: move an instance to Standby for troubleshooting or patching. It is deregistered from the load balancer and not health-checked, but remains in the group. Optionally decrement desired capacity so no replacement is launched. Exit standby to return it.</li>
+  <li>Suspend and resume processes: Launch, Terminate, AddToLoadBalancer, AlarmNotification, AZRebalance, HealthCheck, InstanceRefresh, ReplaceUnhealthy, ScheduledActions. Suspend AlarmNotification to freeze dynamic scaling during an incident investigation; always resume afterwards.</li>
+  <li>Termination policies (which instance to remove on scale-in): default picks the AZ with the most instances, then considers allocation strategy, then instances with the oldest launch template or configuration, then the instance closest to the next billing hour. Others: OldestInstance, NewestInstance, OldestLaunchTemplate, ClosestToNextInstanceHour, AllocationStrategy, or a custom Lambda.</li>
+  <li>Instance maximum lifetime: automatically replace instances older than N days (minimum 1 day). Good for enforcing regular patching and limiting drift.</li>
+  <li>Notifications: EventBridge events for launch and terminate success and failure. Route failures to your alerting.</li>
+</ul>
+<pre>aws autoscaling set-instance-protection --auto-scaling-group-name web-asg --instance-ids i-0abc123 --protected-from-scale-in
+aws autoscaling enter-standby --auto-scaling-group-name web-asg --instance-ids i-0abc123 --should-decrement-desired-capacity
+aws autoscaling exit-standby --auto-scaling-group-name web-asg --instance-ids i-0abc123
+aws autoscaling suspend-processes --auto-scaling-group-name web-asg --scaling-processes AlarmNotification
+aws autoscaling resume-processes --auto-scaling-group-name web-asg --scaling-processes AlarmNotification</pre>
+
+<h3 id="m5-labs">5.5 Module 5 labs</h3>
+<p>Lab 5A - Lifecycle hooks</p>
+<ol>
+  <li>Add a launch hook (heartbeat 600 s, default ABANDON). Update user data in a new launch template version: sleep 60 to simulate warmup, curl localhost/health, then call complete-lifecycle-action. Add autoscaling:CompleteLifecycleAction to web-ec2-role.</li>
+  <li>Scale out by 1. Observe the instance in Pending:Wait, then InService, then registered in the target group.</li>
+  <li>Break the script so it never completes. Observe the instance being abandoned after the timeout (shorten heartbeat to 120 s for this test).</li>
+  <li>Add a termination hook with an EventBridge rule that triggers a Lambda which logs the instance ID and then completes the action.</li>
+</ol>
+
+<p>Lab 5B - Instance refresh with rollback</p>
+<ol>
+  <li>Create a CloudWatch alarm web-alb-5xx-high on HTTPCode_Target_5XX_Count above 10 in 1 minute.</li>
+  <li>Create launch template version that changes the page to "version v2". Start an instance refresh with min 100, max 150, checkpoints at 50 percent, auto rollback, and the alarm. Refresh the browser and watch v1 and v2 mixed, then only v2.</li>
+  <li>Create a broken version (nginx configured to return 500 for /). Start an instance refresh and generate traffic. Observe the alarm triggering rollback.</li>
+</ol>
+
+<p>Lab 5C - Warm pool</p>
+<ol>
+  <li>Remove any mixed instances policy (warm pools do not support it). Add a warm pool in Stopped state, min size 1, reuse on scale in.</li>
+  <li>Measure time to InService when scaling out from the warm pool vs a fresh launch (temporarily delete the warm pool to compare).</li>
+  <li>Check that the user data and the nginx service behave correctly after a stop and start.</li>
+</ol>
+
+<h3>5.6 Module 5 assignments</h3>
+<ol>
+  <li>Design the shutdown sequence for a worker that processes video jobs lasting up to 20 minutes: which features (scale-in protection, termination lifecycle hook, heartbeat) do you use and how?</li>
+  <li>Write a runbook for "deploy a new AMI to production" using instance refresh, including pre-checks, the exact preferences, what to watch, and the rollback trigger.</li>
+  <li>An app takes 8 minutes to boot and traffic doubles within 3 minutes every morning. Compare three solutions: higher minimum, predictive scaling, warm pool. Estimate the cost of each for 4 extra m6i.large instances in your region.</li>
+</ol>
+
+
+<!-- ============================================================ -->
+<h2 id="m6">Module 6 - Putting it together: Auto Scaling + ALB</h2>
+
+<h3 id="m6-1">6.1 Auto Scaling with ALB  - Production importance: Critical</h3>
+<p>This topic appears in both of your lists (Auto Scaling with ALB, and Auto Scaling + ALB). They are the same integration, covered here.</p>
+<p>How the two services cooperate:</p>
+<ul>
+  <li>The ASG is attached to one or more target groups (not to the load balancer directly for ALB/NLB).</li>
+  <li>Every instance the ASG launches is registered to all attached target groups when it becomes InService. Every instance the ASG terminates is deregistered first, with deregistration delay respected.</li>
+  <li>With ELB health checks enabled on the ASG, the target group's health view drives instance replacement.</li>
+  <li>The ALB provides the metric RequestCountPerTarget, which the ASG can use for target tracking.</li>
+  <li>One ASG can be attached to several target groups (for example port 80 for the web app and port 9100 for metrics), and one target group can be used by several listener rules.</li>
+</ul>
+<pre>aws autoscaling attach-traffic-sources --auto-scaling-group-name web-asg \
+  --traffic-sources Identifier=$TG_ARN
+# older equivalent:
+aws autoscaling attach-load-balancer-target-groups --auto-scaling-group-name web-asg --target-group-arns $TG_ARN</pre>
+<p>Timing settings must be consistent with each other. A common, working set for a web app that boots in about 90 seconds:</p>
+<table>
+  <tr><th>Setting</th><th>Value</th><th>Reason</th></tr>
+  <tr><td>Target group health check interval / healthy threshold</td><td>10 s / 3</td><td>About 30 s to become healthy after app starts</td></tr>
+  <tr><td>Target group unhealthy threshold</td><td>3</td><td>About 30 s to detect failure, tolerates a single slow response</td></tr>
+  <tr><td>ASG health check grace period</td><td>180 s</td><td>Boot (90 s) plus becoming healthy (30 s) plus margin</td></tr>
+  <tr><td>ASG default instance warmup</td><td>120 to 180 s</td><td>Metrics from booting instances ignored</td></tr>
+  <tr><td>Deregistration delay</td><td>30 to 60 s</td><td>Longer than normal requests</td></tr>
+  <tr><td>Slow start (optional)</td><td>60 s</td><td>New instances ramp up gently</td></tr>
+  <tr><td>App keep-alive timeout</td><td>65 to 75 s</td><td>Longer than ALB idle timeout of 60 s</td></tr>
+</table>
+
+<h3 id="m6-2">6.2 Dynamic registration</h3>
+<ul>
+  <li>Dynamic registration means targets are added to and removed from target groups automatically as they appear and disappear, with no manual register-targets calls.</li>
+  <li>For EC2: done by the ASG through the attached target groups (AddToLoadBalancer process). If you suspend AddToLoadBalancer, new instances launch but do not receive traffic; when resumed, they are not automatically registered retroactively in all cases, so check.</li>
+  <li>For containers on ECS: the ECS service registers each task with its dynamic host port (dynamic port mapping with bridge networking) or its own IP (awsvpc networking with target type ip). Multiple tasks can run on one instance on different ports, all in one target group.</li>
+  <li>For EKS: the AWS Load Balancer Controller registers pods or nodes.</li>
+  <li>For on-premises or other IPs: your own automation (Lambda) calls register-targets with target type ip.</li>
+  <li>Never manually register instances into a target group that is also managed by an ASG. Manually added instances are not managed by the ASG and are forgotten in scale-in and refresh events.</li>
+</ul>
+<p>Common live issue: instances launched by the ASG are running and healthy in EC2, but receive no traffic. Causes, in order of likelihood: the ASG is not attached to the target group the listener uses (attached to an old target group from a previous deployment); AddToLoadBalancer is suspended; the instance's AZ is not enabled on the load balancer; the security group blocks the ALB. Fix: compare the ASG's attached target group ARN with the listener rule's target group ARN first.</p>
+
+<h3 id="m6-3">6.3 EC2 behind ALB - reference architecture (Production importance: Critical)</h3>
+<pre>                         Internet
+                            |
+                    Route 53 alias record (app.example.com)
+                            |
+                  AWS WAF (managed rules, rate limit)
+                            |
+ +-------------------------- VPC 10.0.0.0/16 ------------------------------+
+ |  Public subnets (AZ-a 10.0.1.0/24, AZ-b 10.0.2.0/24, AZ-c 10.0.3.0/24)   |
+ |     Application Load Balancer  (sg: alb-sg, 443 from internet)          |
+ |        listener 80  -&gt; redirect to 443                                  |
+ |        listener 443 -&gt; ACM cert -&gt; rules -&gt; target group web-tg         |
+ |     NAT Gateway in each AZ                                              |
+ |                                                                         |
+ |  Private app subnets (AZ-a, AZ-b, AZ-c)                                 |
+ |     Auto Scaling group web-asg (launch template, ELB health checks)     |
+ |        EC2  EC2  EC2 ...   (sg: web-sg, port 80 from alb-sg only)       |
+ |        IAM role: SSM, CloudWatch agent, read own secrets                |
+ |                                                                         |
+ |  Private data subnets (AZ-a, AZ-b, AZ-c)                                |
+ |     RDS Multi-AZ (sg: db-sg, 5432 from web-sg only)                     |
+ |     ElastiCache for sessions (sg: cache-sg, 6379 from web-sg only)      |
+ +-------------------------------------------------------------------------+
+   VPC endpoints: S3 gateway endpoint, SSM, CloudWatch Logs, Secrets Manager
+   Logs: ALB access logs to S3, app logs to CloudWatch Logs
+   Monitoring: CloudWatch dashboard and alarms, ASG group metrics</pre>
+<p>Design principles in this architecture:</p>
+<ul>
+  <li>Security group chaining: each tier accepts traffic only from the security group of the tier in front of it. No instance is directly reachable from the internet.</li>
+  <li>No SSH: Session Manager for access, no port 22, no bastion host required.</li>
+  <li>Three AZs: losing one AZ leaves two thirds of capacity; the ASG backfills in the remaining AZs.</li>
+  <li>Stateless instances: sessions in ElastiCache, files in S3, data in RDS.</li>
+  <li>Immutable deployments: new AMI or launch template version, rolled out with instance refresh.</li>
+  <li>VPC endpoints reduce NAT cost and keep AWS API traffic private.</li>
+</ul>
+
+<h3 id="m6-4">6.4 End-to-end walkthrough</h3>
+<p>Request path:</p>
+<ol>
+  <li>The client resolves app.example.com. Route 53 returns IPs of ALB nodes in each AZ.</li>
+  <li>The client connects to an ALB node over TLS. WAF inspects the request. The ALB terminates TLS using the ACM certificate.</li>
+  <li>The listener rules match the request and pick target group web-tg.</li>
+  <li>The ALB picks a healthy target (round robin or least outstanding requests, honouring stickiness if enabled), adds X-Forwarded-For and X-Forwarded-Proto headers, and sends the request to the instance on port 80.</li>
+  <li>The instance processes the request, reads the session from ElastiCache, queries RDS, and responds.</li>
+</ol>
+<p>Scale-out path:</p>
+<ol>
+  <li>Traffic increases. RequestCountPerTarget rises above the target value.</li>
+  <li>The target tracking alarm fires. The ASG increases desired capacity (for example 3 to 5).</li>
+  <li>The ASG launches 2 instances from the launch template, balanced across AZs (from the warm pool if one exists).</li>
+  <li>Launch lifecycle hook: the instance boots, the app starts and warms up, then signals completion.</li>
+  <li>The instance goes InService and is registered to web-tg. It is in the initial state until it passes the healthy threshold.</li>
+  <li>The ALB starts sending traffic (gradually, if slow start is on). After the instance warmup period, its metrics count toward the group average.</li>
+</ol>
+<p>Scale-in path:</p>
+<ol>
+  <li>Traffic falls. After the sustained period, the scale-in alarm fires and desired capacity decreases.</li>
+  <li>The termination policy picks an instance (not scale-in protected), from the AZ with the most instances.</li>
+  <li>The instance is deregistered from web-tg and enters draining. In-flight requests finish within the deregistration delay.</li>
+  <li>Termination lifecycle hook: logs are uploaded, then the action is completed.</li>
+  <li>The instance is terminated.</li>
+</ol>
+
+<h3 id="m6-labs">6.5 Capstone lab - production-style stack</h3>
+<p>Build the full architecture from 6.3 (you may skip RDS and ElastiCache to save cost, or use the smallest sizes and delete them the same day). Preferably build it with CloudFormation or Terraform so you can recreate and delete it easily.</p>
+<p>Acceptance criteria:</p>
+<ol>
+  <li>EC2 instances run in private subnets in at least 2 AZs, with no public IPs and no SSH; Session Manager works.</li>
+  <li>HTTPS only (HTTP redirects), TLS 1.2 minimum, ACM certificate (or HTTP only if you have no domain, documented).</li>
+  <li>Security groups are chained: web-sg only allows the ALB security group.</li>
+  <li>ASG: launch template with IMDSv2 required, ELB health checks, correct grace period, default instance warmup, min 2 and max 6, group metrics enabled.</li>
+  <li>Target tracking policy on ALBRequestCountPerTarget plus a scheduled action for business hours.</li>
+  <li>Deregistration delay 30 seconds, health check on /health with interval 10.</li>
+  <li>Termination lifecycle hook that uploads /var/log/nginx/access.log to S3.</li>
+  <li>ALB access logs enabled to S3.</li>
+  <li>CloudWatch alarms: ALB 5xx rate, target 5xx rate, UnHealthyHostCount above 0 for 5 minutes, HealthyHostCount below 2, TargetResponseTime p99 above 1 second, ASG desired equals max.</li>
+  <li>A dashboard with request count, latency, error counts, healthy hosts, and ASG desired/in-service capacity.</li>
+  <li>Demonstrate: a load test triggers scale-out and later scale-in with zero 5xx errors; an instance refresh to a new version with zero 5xx errors; terminating an instance causes self-healing with zero 5xx errors.</li>
+</ol>
+<p>Game day exercises for the capstone (do each, observe, write down what happened):</p>
+<ol>
+  <li>Stop nginx on one instance.</li>
+  <li>Change web-sg to remove the rule allowing alb-sg. Observe health checks, then restore.</li>
+  <li>Simulate an AZ failure: update the ASG to remove one AZ's subnet. Watch rebalancing.</li>
+  <li>Deploy a launch template version with a typo in user data. Watch instance refresh fail and roll back.</li>
+  <li>Set max capacity to 2 and run a load test. Observe and alarm on capacity saturation.</li>
+  <li>Make /health depend on a fake dependency that you then break. Observe the cascading failure described in 2.8, then fix the design.</li>
+</ol>
+
+
+<!-- ============================================================ -->
+<h2 id="m7">Module 7 - Live environment: priorities, checklist, common issues</h2>
+
+<h3>7.1 Topics ranked by importance for a live setup</h3>
+<p>Critical - mistakes here commonly cause outages:</p>
+<ol>
+  <li>Health checks (load balancer and ASG), health check design (shallow), and grace period.</li>
+  <li>Multi-AZ for both the load balancer and the ASG, including NAT per AZ.</li>
+  <li>Minimum and maximum capacity, plus handling of desired capacity in infrastructure as code.</li>
+  <li>Launch template correctness (AMI, security groups, IAM role, user data) and version strategy.</li>
+  <li>Target tracking policy with a good metric and instance warmup.</li>
+  <li>TLS termination with auto-renewing certificates and a modern policy.</li>
+  <li>Instance refresh (or another safe deployment method) with rollback.</li>
+  <li>Security group chaining and private subnets for instances.</li>
+  <li>Stateless application design.</li>
+</ol>
+<p>High - affects reliability and user experience:</p>
+<ol>
+  <li>Deregistration delay plus graceful shutdown in the app.</li>
+  <li>Cross-zone load balancing (especially NLB).</li>
+  <li>Scheduled scaling for known events.</li>
+  <li>Lifecycle hooks for readiness and clean shutdown.</li>
+  <li>CloudWatch metrics, group metrics, alarms, and access logs.</li>
+  <li>Mixed instance types to avoid capacity shortages.</li>
+  <li>Keep-alive and idle timeout alignment.</li>
+</ol>
+<p>Medium - important in specific cases: predictive scaling, warm pools, sticky sessions, step scaling, slow start, NLB specifics.</p>
+<p>Low: simple scaling and launch configurations (know them, do not use them in new designs).</p>
+
+<h3>7.2 Production checklist</h3>
+<p>Load balancer:</p>
+<ul>
+  <li>Subnets in 2 or more AZs (3 preferred); internal vs internet-facing chosen correctly.</li>
+  <li>HTTPS listener with ACM certificate (DNS validated), modern TLS policy; HTTP redirects to HTTPS.</li>
+  <li>WAF attached (internet-facing). Deletion protection on. Access logs on. Drop invalid headers on.</li>
+  <li>Idle timeout reviewed; app keep-alive longer than it.</li>
+  <li>Route 53 alias record, not CNAME to hard-coded IPs.</li>
+</ul>
+<p>Target group:</p>
+<ul>
+  <li>Dedicated shallow /health endpoint, no auth, no redirects, accepts IP Host header.</li>
+  <li>Interval, thresholds, and timeout tuned; health check port allowed in security group.</li>
+  <li>Deregistration delay matches request duration; app handles SIGTERM.</li>
+  <li>Stickiness only if required, with short duration.</li>
+  <li>Algorithm chosen (least outstanding requests for uneven request costs).</li>
+</ul>
+<p>Launch template:</p>
+<ul>
+  <li>Golden AMI built by a pipeline, patched regularly; AMI protected from deletion while in use.</li>
+  <li>IMDSv2 required; IAM role with least privilege; no secrets in user data; EBS encrypted.</li>
+  <li>Detailed monitoring on; CloudWatch agent for memory, disk, and logs.</li>
+  <li>Tags for cost allocation propagate to instances and volumes.</li>
+</ul>
+<p>Auto Scaling group:</p>
+<ul>
+  <li>Subnets in the same AZs as the load balancer, private subnets.</li>
+  <li>Health check type ELB; grace period above real boot time.</li>
+  <li>Min supports AZ loss; max covers peak and fits service quotas; desired not overwritten by IaC.</li>
+  <li>Default instance warmup set. Group metrics enabled.</li>
+  <li>Target tracking policy, plus scheduled or predictive if traffic is cyclic.</li>
+  <li>Mixed instance types (where possible). Instance maintenance policy with min healthy 100 for critical apps.</li>
+  <li>Lifecycle hooks: launch readiness (ABANDON default), termination cleanup.</li>
+  <li>Deployment through instance refresh with checkpoints, alarms, and auto rollback.</li>
+  <li>Notifications for failed launches and terminations. No processes left suspended.</li>
+</ul>
+<p>Alarms (minimum set):</p>
+<ul>
+  <li>ALB: HTTPCode_ELB_5XX_Count, HTTPCode_Target_5XX_Count (as a percentage of RequestCount using metric math), TargetResponseTime p95/p99, RejectedConnectionCount.</li>
+  <li>Target group: UnHealthyHostCount above 0 for a sustained period, HealthyHostCount below minimum.</li>
+  <li>ASG: GroupDesiredCapacity equals GroupMaxSize; GroupInServiceInstances below GroupDesiredCapacity for more than 15 minutes (launches failing).</li>
+  <li>ACM DaysToExpiry below 30 (important for imported certificates).</li>
+  <li>EC2 vCPU service quota usage above 80 percent.</li>
+</ul>
+
+<h3>7.3 Common live issues - troubleshooting runbook</h3>
+<table>
+  <tr><th>Symptom</th><th>Likely causes</th><th>How to check / fix</th></tr>
+  <tr><td>All targets unhealthy right after setup</td><td>Security group does not allow ALB; wrong health check path or port; app not listening on 0.0.0.0; health path returns 301/302/401</td><td>describe-target-health shows reason codes (Target.Timeout means network/SG, Target.ResponseCodeMismatch means wrong code). From the instance: curl -v localhost/health. Check web-sg source is alb-sg.</td></tr>
+  <tr><td>Instances launched and terminated in a loop</td><td>Grace period shorter than boot; user data failing; app crash on start; launch hook abandons</td><td>ASG activity history cause message; /var/log/cloud-init-output.log via Session Manager or EC2 console system log; temporarily suspend ReplaceUnhealthy to inspect, then resume.</td></tr>
+  <tr><td>Scale-out does not happen</td><td>At max capacity; alarm INSUFFICIENT_DATA; AlarmNotification suspended; scaling policy deleted by IaC; vCPU quota reached; InsufficientInstanceCapacity</td><td>describe-scaling-activities; describe-policies; CloudWatch alarm state; Service Quotas console; add instance types and AZs.</td></tr>
+  <tr><td>Scale-out happens but too late</td><td>5-minute basic monitoring; long boot; no warmup; simple scaling cooldown</td><td>Detailed monitoring, baked AMI, warm pool, predictive or scheduled scaling, lower target value.</td></tr>
+  <tr><td>Flapping (scale out and in repeatedly)</td><td>Target value near normal noise; warmup missing; competing policies; scheduled action conflicts</td><td>Activity history timeline; set warmup; review all policies and scheduled actions.</td></tr>
+  <tr><td>Intermittent 502</td><td>Keep-alive shorter than ALB idle timeout; app crashing under load; response headers too large; HTTPS target with TLS issues</td><td>ALB access logs (target_status_code is "-" when the target closed the connection); app server keep-alive setting; app logs.</td></tr>
+  <tr><td>503 errors</td><td>No registered targets; wrong target group on the rule; ASG scaled to 0</td><td>Target group target list; listener rule target group ARN vs ASG attached target group ARN.</td></tr>
+  <tr><td>504 errors</td><td>Slow backend; idle timeout too short for long requests; network block</td><td>TargetResponseTime metric; slow queries; consider async processing instead of raising idle timeout.</td></tr>
+  <tr><td>5xx bursts during deployments or scale-in</td><td>Deregistration delay 0 or too short; app killed immediately; health check too slow to remove failing new instances</td><td>Set delay, graceful SIGTERM handling, launch hook readiness, instance refresh with min healthy 100.</td></tr>
+  <tr><td>Uneven load across instances</td><td>Stickiness; cross-zone off (NLB); unbalanced AZs; long-lived connections (WebSocket, gRPC) pinned to old instances</td><td>RequestCountPerTarget per instance; enable cross-zone; shorten stickiness; least outstanding requests algorithm.</td></tr>
+  <tr><td>Users logged out randomly</td><td>Local session storage with stickiness off or instance replaced</td><td>Move sessions to a shared store.</td></tr>
+  <tr><td>App sees ALB IP instead of client IP</td><td>Expected behaviour of ALB</td><td>Use X-Forwarded-For (configure the web server's real IP module and trust only the VPC range).</td></tr>
+  <tr><td>Redirect loop on HTTPS</td><td>App enforces HTTPS but sees HTTP from ALB</td><td>App must honour X-Forwarded-Proto.</td></tr>
+  <tr><td>Certificate expired</td><td>Imported certificate; DNS validation record deleted</td><td>Use ACM issued and DNS validated; alarm on DaysToExpiry.</td></tr>
+  <tr><td>New instances run old code or config</td><td>Launch template version reference; warm pool instances from old version; in-place deploys not applied to new instances</td><td>Check the ASG's launch template version; instance refresh; immutable deployments.</td></tr>
+  <tr><td>Instances stuck in Pending:Wait</td><td>Lifecycle hook never completed</td><td>IAM permission for CompleteLifecycleAction, script errors, region; reduce heartbeat timeout.</td></tr>
+  <tr><td>Instance refresh stuck or slow</td><td>New instances unhealthy; min healthy 100 with max healthy 100; long warmup; checkpoint delay</td><td>describe-instance-refreshes status reason; fix version; set max healthy above 100; use auto rollback.</td></tr>
+  <tr><td>Desired capacity reset after infrastructure deploy</td><td>IaC hard-codes desired capacity</td><td>Ignore changes to desired capacity in Terraform, or omit it in CloudFormation updates.</td></tr>
+  <tr><td>Unexpected large bill</td><td>Runaway scaling due to bug; max too high; NAT Gateway data; NLB cross-zone data; stopped warm pool EBS</td><td>Alarm on desired near max; Cost Explorer by tag; VPC endpoints.</td></tr>
+  <tr><td>Whole fleet replaced during dependency outage</td><td>Deep health check plus ELB health checks on the ASG</td><td>Shallow health check; dependency status on separate endpoint for monitoring only.</td></tr>
+</table>
+
+<h3>7.4 General things to take care of in live environments</h3>
+<ul>
+  <li>Change management: test every launch template, health check, and scaling change in staging under load first. Load-test new instance types before production.</li>
+  <li>Infrastructure as code for everything. Manual console changes drift and get overwritten.</li>
+  <li>Never debug by SSH-editing a production instance that the ASG might replace; your fix disappears at the next scale event. Fix the AMI or template.</li>
+  <li>Test scaling regularly (monthly game day). Configuration that only runs during a rare scale-out event tends to be broken exactly then.</li>
+  <li>Know your boot time end to end (launch, boot, user data, app start, health check pass). It drives grace period, warmup, scheduled lead time, and whether you need warm pools.</li>
+  <li>Watch dependencies: scaling the web tier from 4 to 40 instances multiplies database connections by 10. Use connection pooling (RDS Proxy) and set connection limits.</li>
+  <li>Service quotas: EC2 vCPU limits per instance family and purchase option, ALB per region, target groups, rules per listener. Request increases before you need them.</li>
+  <li>Spot: if using Spot in the mix, keep a base of On-Demand, use capacity-optimized allocation, enable capacity rebalancing, and handle the 2-minute interruption notice.</li>
+  <li>Logging and evidence: central logs, ALB access logs, ASG activity history (kept for 6 weeks), CloudTrail for who changed what.</li>
+  <li>Security: no public instances, IMDSv2, least-privilege instance roles, WAF, regular AMI patching (instance maximum lifetime helps enforce).</li>
+</ul>
+
+
+<!-- ============================================================ -->
+<h2 id="m8">Module 8 - Self assessment</h2>
+
+<h3>8.1 Quiz (answers in the Appendix)</h3>
+<ol>
+  <li>What three values define ASG capacity, and what is the rule between them?</li>
+  <li>Which health check type should an ASG behind an ALB use, and why?</li>
+  <li>What does the health check grace period do, and what are its defaults in the console and API?</li>
+  <li>Name the four predefined target tracking metrics.</li>
+  <li>Why is total ALB RequestCount a bad target tracking metric while RequestCountPerTarget is a good one?</li>
+  <li>What is the difference between cooldown and instance warmup, and which policy types use each?</li>
+  <li>When multiple scaling policies trigger at the same time, which one wins?</li>
+  <li>What does an ALB return when a target group has no registered targets? When the target times out?</li>
+  <li>What is the default deregistration delay and what does it do?</li>
+  <li>Is cross-zone load balancing on or off by default for ALB and for NLB? Who pays for inter-AZ data?</li>
+  <li>Name two ways an application behind an ALB can learn the real client IP and the original protocol.</li>
+  <li>Why should a launch lifecycle hook usually default to ABANDON?</li>
+  <li>What does maximum healthy percentage above 100 achieve during instance refresh?</li>
+  <li>List the three warm pool states and the cost of each.</li>
+  <li>What are two reasons launch configurations should be migrated to launch templates?</li>
+  <li>How much history does predictive scaling need, and what mode should you start with?</li>
+  <li>What happens when every target in an ALB target group is unhealthy?</li>
+  <li>Which ASG process would you suspend to freeze dynamic scaling during an investigation?</li>
+  <li>What must be true about the ALB's subnets relative to the ASG's subnets?</li>
+  <li>Why does an NLB with instance targets often need a broader security group rule than an ALB?</li>
+</ol>
+
+<h3>8.2 Scenario questions (write your answer, then compare with the answer key)</h3>
+<ol>
+  <li>Every morning at 9:00, latency spikes for 10 minutes and then recovers. Target tracking on CPU 60 percent is configured. Instances take 5 minutes to boot. What would you change?</li>
+  <li>During a database failover, the web tier was fully replaced and stayed down for 20 minutes after the database recovered. What happened and how do you prevent it?</li>
+  <li>After enabling an HTTPS listener, users report "too many redirects". What is wrong?</li>
+  <li>The bill doubled. CloudWatch shows the ASG at max capacity of 50 for 3 days, while traffic is normal. CPU is 100 percent on all instances. What happened and what controls would have limited the damage?</li>
+  <li>After each deployment, around 50 users report failed uploads. Uploads can take 2 minutes. What do you check?</li>
+  <li>A new ASG for a queue worker scales on CPU. Workers mostly wait on an external API, CPU stays at 15 percent, and the queue grows to 100,000 messages. What should the scaling metric be?</li>
+  <li>An NLB fronts 6 instances: 4 in AZ-a and 2 in AZ-b. AZ-b instances are overloaded. Why, and what are the two fixes?</li>
+  <li>Scale-out events in one region fail with "We currently do not have sufficient m5.xlarge capacity in the Availability Zone you requested". What is the long-term fix?</li>
+</ol>
+
+<h3>8.3 Final project (portfolio quality)</h3>
+<p>Write the capstone stack from Module 6 as Terraform or CloudFormation in a Git repository, with:</p>
+<ul>
+  <li>A README explaining the architecture with a diagram, every timing value chosen and why, and the cost estimate per month.</li>
+  <li>A deployment runbook (instance refresh) and a rollback runbook.</li>
+  <li>An incident runbook covering at least 8 rows from the troubleshooting table, with the exact CLI commands to diagnose each.</li>
+  <li>Load test results: requests per second per instance at which latency degrades, and the target tracking value derived from it.</li>
+  <li>Game day report: what you broke, what you observed, time to recover, what you changed.</li>
+</ul>
+
+
+<!-- ============================================================ -->
+<h2 id="app">Appendix</h2>
+
+<h3>A.1 CLI cheat sheet</h3>
+<pre># Load balancer and target group
+aws elbv2 describe-load-balancers --names web-alb
+aws elbv2 describe-target-groups --names web-tg
+aws elbv2 describe-target-health --target-group-arn $TG_ARN
+aws elbv2 describe-target-group-attributes --target-group-arn $TG_ARN
+aws elbv2 describe-listeners --load-balancer-arn $ALB_ARN
+aws elbv2 describe-rules --listener-arn $LISTENER_ARN
+aws elbv2 modify-target-group --target-group-arn $TG_ARN --health-check-path /health --health-check-interval-seconds 10
+
+# Auto Scaling group
+aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names web-asg
+aws autoscaling describe-scaling-activities --auto-scaling-group-name web-asg --max-items 20
+aws autoscaling describe-policies --auto-scaling-group-name web-asg
+aws autoscaling describe-scheduled-actions --auto-scaling-group-name web-asg
+aws autoscaling describe-lifecycle-hooks --auto-scaling-group-name web-asg
+aws autoscaling describe-instance-refreshes --auto-scaling-group-name web-asg
+aws autoscaling describe-warm-pool --auto-scaling-group-name web-asg
+aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names web-asg --query 'AutoScalingGroups[0].SuspendedProcesses'
+aws autoscaling update-auto-scaling-group --auto-scaling-group-name web-asg --min-size 2 --max-size 8
+
+# Launch templates
+aws ec2 describe-launch-template-versions --launch-template-name web-lt
+aws ec2 modify-launch-template --launch-template-name web-lt --default-version 2
+
+# Instance debugging
+aws ec2 get-console-output --instance-id i-0abc123 --latest --output text
+aws ssm start-session --target i-0abc123</pre>
+
+<h3>A.2 Cleanup order (to avoid charges and dependency errors)</h3>
+<ol>
+  <li>Delete the warm pool (if any), then delete the ASG with force delete (terminates instances): aws autoscaling delete-auto-scaling-group --auto-scaling-group-name web-asg --force-delete</li>
+  <li>Delete listeners, then the load balancer (disable deletion protection first), then target groups.</li>
+  <li>Delete the launch template.</li>
+  <li>Delete CloudWatch alarms and dashboards you created (target tracking alarms are removed with their policy).</li>
+  <li>Delete NAT Gateways and release their Elastic IPs (often forgotten, keeps charging).</li>
+  <li>Delete RDS/ElastiCache if created, S3 log buckets if no longer needed, then the VPC.</li>
+  <li>Check the Billing console the next day.</li>
+</ol>
+
+<h3>A.3 Glossary</h3>
+<table>
+  <tr><th>Term</th><th>Meaning</th></tr>
+  <tr><td>ASG</td><td>Auto Scaling group</td></tr>
+  <tr><td>AZ</td><td>Availability Zone, an isolated data center group within a region</td></tr>
+  <tr><td>ALB / NLB / GWLB / CLB</td><td>Application / Network / Gateway / Classic Load Balancer</td></tr>
+  <tr><td>Target group</td><td>Pool of backends plus health check and routing settings</td></tr>
+  <tr><td>Listener</td><td>Protocol and port the load balancer accepts connections on</td></tr>
+  <tr><td>LCU</td><td>Load Balancer Capacity Unit, the ALB/NLB usage billing unit</td></tr>
+  <tr><td>Grace period</td><td>Time after InService during which the ASG ignores failed health checks</td></tr>
+  <tr><td>Instance warmup</td><td>Time before a new instance's metrics count toward group metrics</td></tr>
+  <tr><td>Cooldown</td><td>Wait period after a simple scaling action</td></tr>
+  <tr><td>Deregistration delay</td><td>Draining period for in-flight requests (connection draining)</td></tr>
+  <tr><td>IMDSv2</td><td>Session-token based instance metadata service, protects against SSRF credential theft</td></tr>
+  <tr><td>ACM</td><td>AWS Certificate Manager</td></tr>
+  <tr><td>SNI</td><td>Server Name Indication, lets one listener serve multiple certificates</td></tr>
+  <tr><td>Golden AMI</td><td>Pre-built, patched image containing the application runtime</td></tr>
+</table>
+
+<h3>A.4 Quiz answer key</h3>
+<ol>
+  <li>Minimum, desired, maximum. Minimum is less than or equal to desired, which is less than or equal to maximum.</li>
+  <li>ELB health checks (in addition to the always-on EC2 checks), because EC2 checks do not detect application failures.</li>
+  <li>It delays the ASG acting on failed health checks after an instance goes InService, giving the app time to start. Console default 300 seconds, CLI/API default 0.</li>
+  <li>ASGAverageCPUUtilization, ASGAverageNetworkIn, ASGAverageNetworkOut, ALBRequestCountPerTarget.</li>
+  <li>Total requests do not go down when you add instances, so the policy would keep scaling out. Requests per target do go down as capacity is added.</li>
+  <li>Cooldown pauses further simple scaling actions after one completes (simple scaling). Warmup excludes new instances' metrics until they stabilise and counts them as pending capacity (target tracking, step scaling, instance refresh).</li>
+  <li>The one that results in the largest capacity, for both scale-out and scale-in.</li>
+  <li>503 when there are no registered targets; 504 when the target does not respond in time.</li>
+  <li>300 seconds. The load balancer stops sending new requests to the deregistering target but allows in-flight requests to finish for up to that time.</li>
+  <li>ALB on by default (no inter-AZ charge). NLB off by default; when enabled, inter-AZ data is charged.</li>
+  <li>X-Forwarded-For for client IP, X-Forwarded-Proto for protocol (and X-Forwarded-Port). With NLB: client IP preservation or Proxy Protocol v2.</li>
+  <li>So that an instance which never becomes ready is terminated instead of being put into service.</li>
+  <li>New instances can be launched before old ones are terminated, so capacity never drops below desired during the refresh.</li>
+  <li>Stopped (pay EBS and EIPs only), Hibernated (EBS including RAM contents, EIPs), Running (full instance price).</li>
+  <li>Deprecated (no new instance types, new accounts cannot create them) and they lack features such as versioning, mixed instances, and instance refresh rollback.</li>
+  <li>At least 24 hours of history (uses up to 14 days). Start in forecast-only mode.</li>
+  <li>Fail open: the ALB routes requests to all targets in the group.</li>
+  <li>AlarmNotification.</li>
+  <li>The ALB must have subnets in every AZ the ASG uses, otherwise instances in missing AZs are unused.</li>
+  <li>Because the NLB preserves the client IP, so the instance sees internet client addresses as the source, not the load balancer.</li>
+</ol>
+
+<h3>A.5 Scenario answer key</h3>
+<ol>
+  <li>Reactive scaling cannot help when boot (5 minutes) is longer than the spike. Add a scheduled action raising min at about 8:40, or predictive scaling with a scheduling buffer of about 600 seconds, or a warm pool. Also consider a lower CPU target and faster boot via a baked AMI.</li>
+  <li>The health check endpoint checked the database. During failover all targets failed, the ASG (ELB health checks) replaced every instance, and new instances also failed until the database was back, plus their boot time. Use a shallow health check; monitor dependencies separately; possibly use an instance maintenance policy and circuit breakers.</li>
+  <li>The app redirects to HTTPS because it sees HTTP from the ALB (TLS terminated at the ALB). Make the app trust X-Forwarded-Proto, or let the ALB handle the redirect only.</li>
+  <li>A bug (infinite loop, retry storm) caused high CPU; target tracking kept scaling to the maximum. Controls: a reasonable max, an alarm when desired equals max, budget alerts, and alarms on CPU or latency anomalies relative to request count.</li>
+  <li>Deregistration delay versus upload duration (should be at least 120 to 150 seconds for this target group, or move uploads to direct-to-S3 presigned URLs), and whether the app handles SIGTERM gracefully. Check ALB access logs for 502/460 during the deployment window.</li>
+  <li>Backlog per instance: SQS ApproximateNumberOfMessagesVisible divided by in-service instances, with a target based on acceptable processing latency and per-instance throughput.</li>
+  <li>Cross-zone is off by default on NLB, so each AZ node gets about 50 percent of traffic and splits it only across local instances: AZ-b instances each get 25 percent while AZ-a instances get 12.5 percent. Fix by enabling cross-zone load balancing, or by balancing instance counts across AZs.</li>
+  <li>Use a mixed instances policy with several equivalent instance types (or attribute-based selection) and spread across 3 AZs; consider capacity reservations for critical baseline capacity.</li>
+</ol>
+
+<p>End of guide. Recommended next topics after this: EC2 Image Builder for golden AMIs, CodeDeploy blue/green with ASG, Global Accelerator, AWS WAF rules, ECS on EC2 with capacity providers (which builds on everything here).</p>
+
+</body>
+</html>
