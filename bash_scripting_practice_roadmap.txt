@@ -1,0 +1,367 @@
+BASH SCRIPTING PRACTICE ROADMAP
+From Beginner to Advanced — DevOps Engineer (Approximately 3 Years' Experience)
+
+GOAL
+Become comfortable writing, debugging, automating, and maintaining Bash scripts. The objective is to independently automate repetitive production tasks, not merely memorize Bash syntax.
+
+ROADMAP OVERVIEW
+1. Bash fundamentals and control flow
+2. Filesystem and Linux administration automation
+3. Process, service, and resource monitoring
+4. Log analysis and troubleshooting
+5. Networking and connectivity checks
+6. User, permission, and security automation
+7. Backup, cleanup, and maintenance scripts
+8. Production-grade scripting practices
+9. DevOps automation and CI/CD integration
+10. Advanced scripting and real-world scenarios
+
+PRACTICE RULE
+Write every script yourself. Do not copy an existing solution. Test valid inputs, invalid inputs, missing files, permission errors, and unexpected conditions.
+
+
+PHASE 1: BASH FUNDAMENTALS (ASSIGNMENTS 1–10)
+Level: Beginner
+
+1. System information script
+   Display hostname, OS, kernel version, uptime, CPU count, and RAM.
+
+2. User input script
+   Accept username and age as input. Validate empty inputs.
+
+3. File and directory checker
+   Accept a path and check whether it exists, is a file, or is a directory.
+
+4. File permission checker
+   Check read, write, and execute permissions for a given file.
+
+5. Even/odd number checker
+   Accept a number and identify whether it is even or odd. Handle invalid input.
+
+6. Multiplication table
+   Accept a number and print its multiplication table using a loop.
+
+7. File extension counter
+   Count files by extension in a given directory.
+
+8. Backup script
+   Copy a directory to a backup directory with a timestamp.
+
+9. Command-line arguments
+   Accept source and destination paths using $1, $2, $#, and $@.
+
+10. Menu-driven utility
+    Create a menu to display system information, disk usage, memory, and uptime using case.
+
+Concepts to master:
+- Variables, quoting, and command substitution
+- if, elif, else, and case
+- for, while, and until
+- Functions and return codes
+- Positional parameters
+- Exit status ($?)
+- Arithmetic operations
+
+
+PHASE 2: LINUX ADMINISTRATION AUTOMATION (ASSIGNMENTS 11–20)
+Level: Beginner to Intermediate
+
+11. User creation script
+    Read usernames from a file and create Linux users if they do not exist.
+
+12. User validation
+    Check whether a given user exists and whether their account is locked.
+
+13. Bulk directory creation
+    Read directory names from a file and create them.
+
+14. Permission management
+    Apply specified ownership and permissions to multiple directories.
+
+15. Disk cleanup
+    Find files older than a specified number of days and clean them from a target directory.
+
+16. Large file finder
+    Identify the 10 largest files under a specified directory.
+
+17. Empty file finder
+    Find empty files and empty directories recursively.
+
+18. Log rotation utility
+    Archive old log files, compress them, and remove archives past a retention period.
+
+19. Package installation
+    Check whether packages are installed; install missing packages using apt or dnf.
+
+20. Service management
+    Check whether services are running and start stopped services.
+
+Concepts to master:
+- find, grep, awk, sed, sort, uniq
+- cut, tr, and xargs
+- chmod, chown, and stat
+- useradd, id, and passwd
+- systemctl and journalctl
+- tar and gzip
+- apt and dnf
+
+
+PHASE 3: MONITORING AND TROUBLESHOOTING (ASSIGNMENTS 21–30)
+Level: Intermediate
+
+21. CPU monitoring
+    Monitor CPU utilization and print a warning if it exceeds a configurable threshold.
+
+22. Memory monitoring
+    Check memory utilization and alert when it crosses a threshold.
+
+23. Disk monitoring
+    Check all mounted filesystems and alert when usage exceeds 80%.
+
+24. Process monitoring
+    Check whether a given process is running. Report its PID and resource usage.
+
+25. Service health checker
+    Monitor multiple services and report which ones are stopped.
+
+26. Application health checker
+    Check an HTTP endpoint using curl and validate the response status code.
+
+27. Port monitoring
+    Check whether specified ports are listening using ss or nc.
+
+28. Log error analyzer
+    Search application logs for ERROR, FATAL, and exceptions. Generate a summary.
+
+29. Failed login analyzer
+    Extract failed SSH login attempts from authentication logs.
+
+30. Server health report
+    Generate a consolidated report containing CPU, memory, disk, processes, services, and uptime.
+
+Production-oriented expectations for assignments 21–30:
+- Support configurable thresholds.
+- Include timestamps in output.
+- Return appropriate exit codes.
+- Write logs to a file.
+- Handle missing commands and files.
+- Produce readable reports.
+
+Example output for a disk monitoring script:
+
+2026-11-11 10:30:00 INFO Disk monitoring started
+2026-11-11 10:30:01 INFO /dev/root usage: 65%
+2026-11-11 10:30:01 WARN /dev/data usage: 92%
+2026-11-11 10:30:01 INFO Disk monitoring completed
+
+
+PHASE 4: NETWORKING AND PRODUCTION TROUBLESHOOTING (ASSIGNMENTS 31–38)
+Level: Intermediate
+
+31. Host connectivity checker
+    Accept multiple hostnames/IPs and check connectivity using ping.
+
+32. DNS resolution checker
+    Validate DNS resolution using dig or nslookup.
+
+33. Port connectivity checker
+    Check TCP connectivity to multiple IP:port combinations.
+
+34. Website availability monitor
+    Check multiple URLs and report HTTP status, response time, and failures.
+
+35. SSL certificate expiry checker
+    Check domain certificate expiry and warn when fewer than 15 days remain.
+
+36. Network interface report
+    Display interfaces, IP addresses, default gateway, and routing table.
+
+37. Application dependency checker
+    Validate connectivity to database, cache, and external API endpoints.
+
+38. Network troubleshooting script
+    Given a hostname, check DNS, ICMP connectivity, TCP connectivity, and HTTP response.
+
+Important concepts:
+- DNS resolution failure
+- Network reachability failure
+- TCP connection failure
+- TLS handshake failure
+- HTTP application failure
+
+The script should help identify which layer is failing.
+
+
+PHASE 5: PRODUCTION-GRADE BASH SCRIPTING (ASSIGNMENTS 39–48)
+Level: Intermediate to Advanced
+
+39. Centralized logging framework
+    Create reusable logging functions for INFO, WARN, ERROR, and DEBUG.
+
+40. Error-handling framework
+    Use set -euo pipefail, traps, and explicit error handling.
+
+41. Configuration-driven script
+    Read settings from an external .conf file instead of hardcoding values.
+
+42. Lock-file implementation
+    Prevent multiple instances of the same script from running simultaneously.
+
+43. Retry mechanism
+    Retry failed commands with configurable attempts and delays.
+
+44. Command timeout utility
+    Terminate commands that exceed a configured execution time.
+
+45. Cleanup with traps
+    Ensure temporary files are removed even when a script fails or receives a signal.
+
+46. Dry-run mode
+    Support --dry-run so users can preview operations without modifying anything.
+
+47. CLI argument parser
+    Support named arguments such as --source, --destination, --retention-days, and --verbose.
+
+48. Script testing
+    Write tests for your Bash functions using Bats or another shell-testing approach.
+
+Concepts to master:
+- set -euo pipefail and its limitations
+- trap, EXIT, INT, and TERM
+- mktemp
+- flock
+- getopts
+- timeout
+- logger
+- ShellCheck
+- Bats
+- Idempotency
+- Signal handling
+- Input validation
+
+Important production scenario for assignment 42:
+Imagine a backup script runs every hour through cron. The previous execution is still running when the next one starts. Without locking, both processes may modify the same backup files. The script should prevent this condition.
+
+
+PHASE 6: REAL-WORLD DEVOPS AUTOMATION (ASSIGNMENTS 49–60)
+Level: Advanced
+
+49. Automated backup and restore
+    Back up application data, compress it, verify integrity, and implement restoration.
+
+50. Database backup automation
+    Take PostgreSQL/MySQL backups, timestamp them, compress them, and apply retention policies.
+
+51. Application deployment script
+    Pull code, install dependencies, build the application, restart the service, and validate health.
+
+52. Zero/low-downtime deployment
+    Implement a basic blue-green deployment using two application directories or ports and a reverse proxy.
+
+53. Automated rollback
+    If deployment health checks fail, restore the previous application version.
+
+54. Multi-server execution
+    Execute a script across multiple Linux servers using SSH and collect individual results.
+
+55. EC2 instance bootstrap
+    Automate initial Linux server configuration: packages, users, SSH settings, directories, and services.
+
+56. Docker cleanup automation
+    Identify unused containers, images, and volumes; implement safe cleanup with dry-run support.
+
+57. Docker health monitoring
+    Monitor container status, restart unhealthy containers where appropriate, and generate alerts.
+
+58. Jenkins agent preparation
+    Automate installation and validation of Java, Git, Docker, and required build tools.
+
+59. CI/CD pipeline utility
+    Create Bash scripts for pre-deployment validation, artifact verification, deployment, and post-deployment checks.
+
+60. Complete server operations toolkit
+    Combine monitoring, backup, deployment, rollback, cleanup, and reporting into a reusable toolkit.
+
+
+HOW TO APPROACH EACH ASSIGNMENT
+
+For every assignment:
+
+1. Understand the requirement
+   Identify the inputs, expected outputs, and possible failure scenarios.
+
+2. Write the script yourself
+   Do not search for the complete solution. Use Linux man pages when needed.
+
+3. Test positive and negative scenarios
+   Try invalid arguments, missing files, unavailable services, permission errors, and empty inputs.
+
+4. Improve the script
+   Add logging, error handling, exit codes, validation, and reusable functions.
+
+5. Review with ShellCheck
+   Fix warnings and improve readability.
+
+6. Document and save
+   Add a README explaining usage, arguments, prerequisites, and example output.
+
+
+EXPECTED SKILLS AFTER COMPLETING THE ROADMAP
+
+- Bash fundamentals: Write scripts without constantly referring to syntax.
+- Linux automation: Automate users, files, permissions, packages, and services.
+- Monitoring: Build CPU, memory, disk, process, and service monitors.
+- Troubleshooting: Automate basic network and application diagnostics.
+- Production scripting: Implement logging, error handling, locking, retries, and cleanup.
+- Deployment: Build deployment and rollback scripts.
+- Infrastructure automation: Automate multi-server operations using SSH.
+- CI/CD: Write reusable scripts for Jenkins and other pipelines.
+- Testing: Validate scripts using ShellCheck and Bats.
+
+
+RECOMMENDED DAILY SCHEDULE
+
+Aim for 1 assignment per day, spending approximately 60–90 minutes on practice.
+
+Monday–Friday:
+- Complete one new assignment.
+
+Saturday:
+- Improve and refactor previous scripts.
+
+Sunday:
+- Solve one troubleshooting scenario without looking at notes.
+
+Do not rush through all 60 assignments. Focus on developing problem-solving ability and writing scripts independently.
+
+
+SUGGESTED GIT REPOSITORY STRUCTURE
+
+bash-practice/
+├── 01-fundamentals/
+├── 02-linux-automation/
+├── 03-monitoring/
+├── 04-networking/
+├── 05-production-scripting/
+├── 06-devops-automation/
+└── README.md
+
+
+IMPORTANT PRODUCTION-SCRIPTING QUESTIONS
+
+Before considering a script production-ready, ask:
+
+- What happens if the script fails halfway?
+- What happens if two instances execute simultaneously?
+- How do you prevent accidental deletion?
+- How do you retry transient failures?
+- How do you debug a script running through cron?
+- How do you ensure the script is safe to execute repeatedly?
+
+These skills distinguish basic scripting knowledge from practical DevOps scripting ability.
+
+FINAL RECOMMENDATION
+
+Do not skip Phase 5. Many engineers can write a Bash script that works, but production scripting requires much more: safe execution, robust error handling, idempotency, observability, testing, and maintainability.
+
+The target is to become capable of independently writing and troubleshooting Bash automation commonly expected of a DevOps engineer with around three years of experience.
