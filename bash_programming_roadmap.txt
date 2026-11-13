@@ -1,0 +1,764 @@
+BASH PROGRAMMING ROADMAP
+Beginner to Advanced — Bash Language and Programming Concepts
+
+SCOPE
+This roadmap focuses on Bash programming syntax and language concepts after learning basic Linux.
+It intentionally excludes Linux administration, troubleshooting, and lists of Linux commands.
+
+============================================================
+PHASE 1 — PROGRAMMING FUNDAMENTALS AND BASH SYNTAX
+============================================================
+
+1. BASH FUNDAMENTALS AND SCRIPT STRUCTURE
+
+- What is Bash?
+- Bash vs Shell vs sh
+- Bash script structure
+- Shebang: #!/bin/bash and #!/usr/bin/env bash
+- Comments using #
+- Single-line and multiline comments (and their limitations)
+- Executing a Bash script
+- Script execution vs sourcing a script
+- Bash syntax rules
+- Statements and commands
+- Semicolons (;) and newlines as statement separators
+- Command chaining using && and ||
+- Command grouping using { } and ( )
+- Exiting a script using exit
+
+2. VARIABLES AND VARIABLE HANDLING
+
+- Declaring and assigning variables
+- Accessing variables using $variable and ${variable}
+- Variable naming rules
+- Reassigning variables
+- Empty and unset variables
+- Checking whether a variable is set or empty
+- Local and global variables
+- Environment variables
+- Exporting variables using export
+- Read-only variables using readonly
+- Removing variables using unset
+- Variable scope and visibility inside functions
+- Special variables:
+  - $0: script name
+  - $1, $2, etc.: positional parameters
+  - $#: number of positional parameters
+  - $@: all positional parameters
+  - $*: all positional parameters
+  - $$: current shell PID
+  - $!: last background process PID
+  - $?: last command exit status
+- Difference between "$@" and "$*"
+
+3. DATA TYPES AND VALUES
+
+- How Bash stores scalar values (primarily as strings)
+- Strings
+- Integers and arithmetic values
+- Empty strings
+- Unset and null-like values
+- Boolean concepts: true and false
+- Indexed arrays
+- Associative arrays
+- Integer attributes using declare -i
+- Read-only and exported variable attributes
+- declare and typeset
+- Difference between the string "false" and a false command exit status
+- Bash does not have native Boolean variables like Java or Python:
+  exit status 0 means success/true; nonzero means failure/false
+
+4. INPUT AND OUTPUT
+
+- Reading input using read
+- Reading one or multiple values
+- read -p for prompts
+- read -s for silent input
+- Reading a single character
+- Handling empty input
+- Default values for input
+- Printing using echo
+- Formatted output using printf
+- Escape sequences such as \n and \t
+- Formatting strings and numbers
+- Quoting output
+- Reading multiline input
+- Here documents (<<EOF)
+- Here strings (<<<)
+
+============================================================
+PHASE 2 — EXPRESSIONS, OPERATORS AND CONDITIONS
+============================================================
+
+5. OPERATORS AND ARITHMETIC OPERATIONS
+
+5.1 Arithmetic operators
+- Addition (+), subtraction (-), multiplication (*)
+- Division (/), modulus (%), exponentiation (**)
+- Increment (++), decrement (--)
+- Unary plus and minus
+- Assignment (=)
+- Compound assignment: +=, -=, *=, /=, %=
+
+5.2 Arithmetic evaluation
+- Arithmetic expansion: $(( ))
+- Arithmetic command: (( ))
+- let
+- Integer calculations
+- Operator precedence
+- Parentheses in arithmetic expressions
+- Integer division
+- Division by zero
+- Pre-increment vs post-increment
+- Negative numbers
+
+5.3 Comparison operators
+- Equal, not equal, greater than, less than
+- Greater than or equal, less than or equal
+- Numeric comparison: -eq, -ne, -gt, -lt, -ge, -le
+- String comparison: ==, !=, <, >
+- Arithmetic comparison using (( ))
+- Conditional comparison using [[ ]]
+
+5.4 Logical operators
+- AND (&&)
+- OR (||)
+- NOT (!)
+- Combining multiple conditions
+- Nested logical expressions
+- Operator precedence
+- Short-circuit evaluation
+- Positive and negative conditions
+- De Morgan's laws
+
+6. CONDITIONAL STATEMENTS
+
+6.1 Basic conditions
+- if
+- if-else
+- if-elif-else
+- Nested if statements
+- Multiple conditions in one if
+- Single-line conditions
+- Empty and invalid conditions
+
+6.2 Conditional evaluation constructs
+- [ ]: traditional test command
+- [[ ]]: Bash conditional expression
+- (( )): arithmetic evaluation
+- test command
+- Negation using !
+
+6.3 String conditions
+- String equality and inequality
+- Empty and non-empty string checks
+- String length
+- Pattern matching
+- Wildcard matching inside [[ ]]
+- Lexicographical comparison
+- Regular expression matching using =~
+
+6.4 Numeric conditions
+- Equal and not equal
+- Greater than and less than
+- Greater than or equal and less than or equal
+- Positive and negative numbers
+- Zero checking
+
+6.5 Logical conditions
+- AND, OR and NOT
+- Combining AND and OR
+- Nested conditions
+- Negating an entire condition
+- Short-circuit behaviour
+
+6.6 Other conditional constructs
+- case statements
+- Multiple matching patterns
+- Default pattern (*)
+- Pattern alternatives using |
+- ;& and ;;&
+- select statements
+- Menu-driven conditions
+- Conditional command execution using && and || without if
+
+============================================================
+PHASE 3 — REPETITION AND DATA STRUCTURES
+============================================================
+
+7. LOOPS AND ITERATION
+
+7.1 Basic loops
+- for loop
+- while loop
+- until loop
+- Infinite loops
+- Nested loops
+
+7.2 For loop variations
+- C-style for loop
+- Iterating over a sequence
+- Iterating over strings
+- Iterating over multiple values
+- Iterating over positional parameters
+- Iterating over command output
+- Iterating over indexed and associative arrays
+
+7.3 While and until loops
+- Basic while and until loops
+- Condition-controlled loops
+- Reading input inside loops
+- Reading multiline input inside loops
+- Counter-based loops
+- Nested while loops
+
+7.4 Loop control
+- break
+- continue
+- Breaking nested loops
+- break N and continue N
+- Flags to control loops
+- Loop termination conditions
+
+7.5 Loop execution behaviour
+- Entry-controlled loops
+- Infinite loops
+- Loop condition evaluation
+- Loop variable updates
+- Arithmetic expressions in loops
+- Looping based on command exit statuses
+
+8. ARRAYS AND DATA STRUCTURES
+
+8.1 Indexed arrays
+- Declaring and initializing arrays
+- Assigning and accessing elements
+- Updating, adding and removing elements
+- Empty arrays and empty values
+- Arrays containing spaces
+- Non-contiguous indexes
+
+8.2 Array operations
+- Array length using ${#array[@]}
+- Accessing indexes and all elements
+- Getting all array indexes
+- Array slicing and expansion
+- Appending and concatenating arrays
+- Copying arrays
+- Removing elements
+- Checking whether an element exists
+- Finding an element's index
+
+8.3 Iterating over arrays
+- for with "${array[@]}"
+- Iterating using array indexes
+- Using ${!array[@]}
+- C-style for loops
+- while loops
+- Reading arrays from input
+- Preserving spaces during iteration
+
+8.4 Associative arrays
+- What associative arrays are
+- Declaring with declare -A
+- Key-value pairs
+- Assigning, accessing and updating values
+- Removing keys
+- Getting all keys and values
+- Getting the number of elements
+- Iterating over keys, values and key-value pairs
+- Checking whether a key exists
+
+8.5 Other data structure concepts
+- Representing lists using indexed arrays
+- Representing maps using associative arrays
+- Nested data structures and limitations
+- Passing arrays to functions
+- Returning arrays from functions
+- Array copying and expansion behaviour
+
+============================================================
+PHASE 4 — FUNCTIONS AND MODULAR PROGRAMMING
+============================================================
+
+9. FUNCTIONS
+
+9.1 Function fundamentals
+- What a function is and why functions are useful
+- Function declaration and definition syntax
+- Function naming rules
+- Calling functions
+- Calling functions multiple times
+- Function execution order
+- Functions calling other functions
+- Nested function calls
+- Reusable functions
+
+9.2 Function arguments
+- Passing arguments to functions
+- Positional arguments inside functions
+- $1, $2, $3, etc. inside functions
+- $#, $@ and $* inside functions
+- Difference between script and function arguments
+- Passing strings containing spaces
+- Passing multiple arguments
+- Passing indexed and associative arrays
+- Optional arguments and default values
+- Validating function arguments
+
+9.3 Function variables and scope
+- Global variables inside functions
+- Local variables using local
+- Variable scope and visibility
+- Variable shadowing
+- Dynamic scoping in Bash
+- Passing variables by reference
+- Nameref variables using local -n
+
+9.4 Function return values
+- Returning status using return
+- Function exit status
+- Returning success (0) and failure (nonzero)
+- Returning different status codes
+- Capturing function status using $?
+- Returning data using echo or printf
+- Capturing output using command substitution
+- Difference between return and echo
+- Returning strings and numbers
+- Returning arrays
+- Returning multiple values
+- Modifying caller variables using references
+- Function output vs function exit status
+
+9.5 Advanced function concepts
+- Recursive functions
+- Function libraries
+- Sourcing function files
+- Function overriding
+- Function tracing and debugging
+
+10. COMMAND-LINE ARGUMENTS AND SCRIPT PARAMETERS
+
+10.1 Positional arguments
+- $0, $1, $2, $3, etc.
+- $#
+- $@
+- $*
+- ${10} and higher positional parameters
+- Difference between "$@" and "$*"
+- Quoted vs unquoted arguments
+- Arguments containing spaces
+
+10.2 Argument manipulation
+- shift and shift N
+- Iterating over arguments
+- Checking argument count
+- Validating mandatory arguments
+- Optional arguments
+- Default argument values
+- Handling missing and extra arguments
+- Argument order
+
+10.3 Advanced argument handling
+- Named arguments such as --option value
+- Short options such as -a and -b
+- Long options such as --name
+- Manual argument parsing
+- Parsing using getopts
+- Options with values
+- Invalid options
+- Combined short options
+- Remaining positional arguments
+- Building a command-line interface (CLI)
+
+============================================================
+PHASE 5 — BASH EXPANSION AND EXECUTION BEHAVIOUR
+============================================================
+
+11. EXPANSION AND SUBSTITUTION
+
+11.1 Variable/parameter expansion
+- $variable and ${variable}
+- ${variable:-default}
+- ${variable-default}
+- ${variable:=default}
+- ${variable=default}
+- ${variable:?error}
+- ${variable:+value}
+- ${#variable}
+- ${variable:offset}
+- ${variable:offset:length}
+
+11.2 String manipulation using parameter expansion
+- Extracting substrings
+- Getting string length
+- Removing prefixes and suffixes
+- Removing shortest/longest matching prefixes
+- Removing shortest/longest matching suffixes
+- Replacing substrings
+- Replacing first occurrence and all occurrences
+- Changing case to uppercase and lowercase
+- Indirect variable expansion using ${!variable}
+- Parameter transformations
+
+11.3 Command substitution
+- $(command)
+- Backticks (legacy syntax)
+- Capturing command output
+- Storing output in variables
+- Nested command substitution
+- Trailing newline behaviour
+- Command substitution vs process substitution
+- Subshell behaviour
+
+11.4 Arithmetic expansion
+- $((expression))
+- Using variables in calculations
+- Nested calculations
+- Arithmetic expansion vs arithmetic command
+
+11.5 Other expansions
+- Tilde expansion (~)
+- Brace expansion ({})
+- Parameter expansion
+- Command substitution
+- Arithmetic expansion
+- Process substitution
+- Pathname expansion (globbing)
+- Expansion order in Bash
+
+12. QUOTING, ESCAPING AND PATTERN MATCHING
+
+12.1 Quoting
+- Single quotes
+- Double quotes
+- Unquoted variables
+- Escaping using backslash
+- Quoting command arguments
+- Strings containing spaces
+- Quoting variables inside conditions
+- Quoting array elements
+- Quoting command substitution
+- Nested quotes
+- Literal vs interpreted characters
+
+12.2 Word splitting
+- What word splitting is
+- When word splitting occurs
+- How IFS affects word splitting
+- Default IFS values
+- Custom IFS
+- Word splitting with unquoted variables
+- Preventing unwanted word splitting
+
+12.3 Globbing and patterns
+- * and ?
+- Character classes such as [abc]
+- Negated character classes
+- Ranges such as [a-z]
+- Extended globbing
+- Pattern matching in [[ ]]
+- Pattern matching in case
+- Filename expansion
+- Glob patterns vs regular expressions
+
+12.4 Regular expressions
+- Regular expression fundamentals
+- Character classes
+- Anchors: ^ and $
+- Quantifiers
+- Groups
+- Alternation
+- Regex matching using =~
+- Capturing groups using BASH_REMATCH
+- Globbing vs regex
+
+13. COMMAND EXECUTION AND PROCESS BEHAVIOUR
+
+13.1 Command execution
+- Executing external commands
+- Executing Bash built-ins
+- Executing shell functions
+- Command lookup order
+- Command substitution
+- Command grouping
+- Sequential and conditional execution
+- Background execution (&)
+- Foreground execution
+- Waiting using wait
+
+13.2 Exit statuses and command chaining
+- What an exit status is
+- Exit status 0 and nonzero statuses
+- $?
+- exit and return
+- Last command status
+- Capturing status immediately
+- Negation using !
+- &&, || and ; execution
+- Command success vs command output
+- Pipeline exit status
+- PIPESTATUS array
+
+13.3 Subshells and execution environments
+- What a subshell is
+- Subshell using ( )
+- Command substitution subshells
+- Pipeline subshells
+- Parent shell vs child shell
+- Variable changes inside subshells
+- Environment inheritance
+- Exported vs non-exported variables
+- Process IDs: $$ and $BASHPID
+- Subshell effects on functions
+- lastpipe behaviour
+
+13.4 Process-related programming concepts
+- Background processes
+- Process IDs and $!
+- wait
+- Job control basics
+- Signals
+- Process termination
+- Asynchronous command execution
+- Waiting for multiple processes
+- Parallel execution basics
+
+============================================================
+PHASE 6 — INPUT/OUTPUT AND ERROR MANAGEMENT
+============================================================
+
+14. REDIRECTION, PIPELINES AND FILE DESCRIPTORS
+
+14.1 Standard streams
+- Standard input (stdin)
+- Standard output (stdout)
+- Standard error (stderr)
+- File descriptors
+- File descriptor 0, 1 and 2
+- Process input/output
+
+14.2 Redirection
+- >
+- >>
+- <
+- 2>
+- 2>>
+- &>
+- &>>
+- 2>&1
+- 1>&2
+- /dev/null
+- Redirecting multiple streams
+- Redirecting output inside functions and loops
+
+14.3 Pipelines
+- Single and multiple pipelines
+- Pipeline execution behaviour
+- Pipeline exit status
+- PIPESTATUS
+- set -o pipefail
+- Pipeline subshell behaviour
+- Passing data between commands
+- Pipelines combined with conditions
+
+14.4 Advanced input/output
+- Here documents (<<)
+- Here strings (<<<)
+- Process substitution: <() and >()
+- Named pipes (FIFO): basic programming usage
+- Reading from file descriptors
+- Writing to file descriptors
+- Opening file descriptors using exec
+- Closing file descriptors
+- Duplicating file descriptors
+
+15. ERROR HANDLING, DEBUGGING AND ADVANCED BASH FEATURES
+
+15.1 Error handling
+- Understanding command failures
+- Checking exit status
+- Conditional error handling
+- set -e
+- set -u
+- set -o pipefail
+- set -o errexit
+- set -o nounset
+- set -o xtrace
+- set -o errtrace
+- set -o functrace
+- trap
+- ERR and EXIT traps
+- INT and TERM traps
+- RETURN trap
+- Unexpected termination
+- Cleanup operations
+- Error messages using printf
+- Custom error-handling functions
+
+15.2 Debugging
+- Syntax checking using bash -n
+- Execution tracing using bash -x
+- Debugging individual commands
+- Debugging functions
+- Debugging variable values
+- Understanding error messages
+- PS4 for detailed tracing
+- Debugging subshells and pipelines
+- ShellCheck for identifying common issues
+
+15.3 Advanced Bash language features
+- declare
+- local
+- readonly
+- typeset
+- unset
+- eval and its risks
+- source and .
+- exec
+- trap
+- mapfile / readarray
+- getopts
+- coproc
+- BASH_SOURCE
+- FUNCNAME
+- BASH_LINENO
+- BASH_REMATCH
+- BASH_COMMAND
+- BASH_VERSION
+- Shell options using set and shopt
+- Extglob
+- Nameref variables
+- Dynamic scoping
+- Function tracing
+- Programmable completion (optional advanced topic)
+
+============================================================
+RECOMMENDED LEARNING ORDER
+============================================================
+
+1.  Bash fundamentals and script structure
+2.  Variables and variable handling
+3.  Data types and values
+4.  Input and output
+5.  Operators and arithmetic
+6.  Conditional statements
+7.  Loops and iteration
+8.  Arrays and data structures
+9.  Functions
+10. Command-line arguments
+11. Expansion and substitution
+12. Quoting and pattern matching
+13. Command execution and process behaviour
+14. Redirection and file descriptors
+15. Error handling, debugging and advanced features
+
+============================================================
+IMPORTANT CONSTRUCTS TO UNDERSTAND
+============================================================
+
+Understand the purpose and differences between these constructs:
+
+- [ ]       Traditional test command
+- [[ ]]     Bash conditional expression
+- (( ))     Arithmetic evaluation
+- $(( ))    Arithmetic expansion
+- { }       Command grouping
+- ( )       Subshell grouping
+- ${ }      Parameter expansion
+- $( )      Command substitution
+- <( )      Process substitution
+
+IMPORTANT DIFFERENCES TO STUDY
+
+- return vs exit
+- return vs echo
+- $? vs $!
+- $@ vs $*
+- = vs ==
+- -eq vs ==
+- && vs -a
+- || vs -o
+- ! vs !=
+- Single quotes vs double quotes
+- $( ) vs <( )
+- for vs while vs until
+- local vs global variables
+- Indexed arrays vs associative arrays
+- Sourcing vs executing a script
+- Parent shell vs subshell
+
+IMPORTANT BEHAVIOURS TO UNDERSTAND
+
+- Why does $? change after every command?
+- Why can an unquoted variable split into multiple arguments?
+- Why does a variable modified inside a subshell not change in the parent shell?
+- Why does return not return a string?
+- Why does Bash treat 0 as success?
+- Why can ((count++)) produce a nonzero exit status?
+- Why can a pipeline execute commands in subshells?
+- Why can an array lose its elements when passed incorrectly to a function?
+- Why can set -e terminate a script unexpectedly?
+
+============================================================
+HOW TO STUDY EACH TOPIC
+============================================================
+
+For every concept, follow this learning pattern:
+
+1. Understand what the concept means.
+2. Learn its syntax.
+3. Understand how it works.
+4. Learn its variations.
+5. Understand common mistakes.
+6. Write 5–10 small programs using that concept.
+7. Combine it with previously learned concepts.
+
+Example: When studying functions:
+
+- Create a function without arguments.
+- Create a function with one argument.
+- Add multiple arguments.
+- Use local and global variables.
+- Return success and failure statuses.
+- Return actual data using printf.
+- Capture function output.
+- Pass arrays to functions.
+- Build a function that validates input and returns an appropriate status.
+
+============================================================
+THREE LEARNING STAGES
+============================================================
+
+STAGE 1 — CORE PROGRAMMING (Topics 1–8)
+
+Variables, data types, conditions, operators, loops, arrays and input/output.
+
+Goal:
+Write small programs independently without referring to examples.
+
+STAGE 2 — STRUCTURED PROGRAMMING (Topics 9–12)
+
+Functions, arguments, return values, parameter expansion, quoting and pattern matching.
+
+Goal:
+Write reusable scripts with proper argument handling and modular structure.
+
+STAGE 3 — ADVANCED BASH (Topics 13–15)
+
+Execution behaviour, subshells, pipelines, redirections, error handling, traps and debugging.
+
+Goal:
+Understand why scripts behave the way they do and write reliable Bash programs.
+
+============================================================
+LEARNING NOTES
+============================================================
+
+- Use Bash 5.x for learning and understand which features are version-dependent.
+- Learn Bash specifically, not only generic POSIX shell syntax.
+- Do not jump into AWS automation, Kubernetes automation, Linux administration scripts or troubleshooting yet.
+- You do not need to master every obscure Bash feature. Focus on the core concepts and their practical behaviour.
+- Treat this document as a syllabus. Study one numbered section at a time, with explanations, examples, exercises and assignments before moving to the next section.
+
+END OF ROADMAP
